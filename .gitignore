@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Training artifacts
+checkpoints/
+logs/
+runs/
+wandb/
+outputs/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+
+# Data
+*.csv
+!configs/*.yaml
+
+# Model weights
+models/
+adapters/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.bbl
+report/*.blg
+report/*.fdb_latexmk
+report/*.fls
+report/*.synctex.gz

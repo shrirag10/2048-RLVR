@@ -1,0 +1,139 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage{xcolor}
+
+\title{Solving 2048: Classical RL vs.\ LLM-Guided RLVR\\
+\large CS 5180 --- Reinforcement Learning}
+\author{Shriman \and Partner Name}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper explores the viability of training a Small Language Model (SLM)
+to play the puzzle game 2048 using Reinforcement Learning with Verifiable
+Rewards (RLVR), specifically Group Relative Policy Optimization (GRPO).
+We benchmark this novel approach against classical RL methods (DQN, PPO)
+to determine if LLMs can learn spatial and game reasoning through self-play
+with deterministic, verifiable rewards. Our experiments reveal... %TODO
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:} Reinforcement Learning, RLVR, GRPO, 2048,
+Deep Q-Network, Proximal Policy Optimization, Language Models
+\end{abstract}
+
+%% ─── 1. Introduction ───────────────────────────────────────────────
+\section{Introduction}
+\label{sec:intro}
+
+% Problem motivation
+% Why 2048 + LLM is novel
+% Research questions
+% Contributions
+
+%% ─── 2. Related Work ───────────────────────────────────────────────
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Classical RL for 2048}
+% Saligram et al. DQN/PPO baselines
+% Other 2048 RL approaches
+
+\subsection{RLVR and GRPO}
+% DeepSeek-R1 \citep{guo2025deepseek}
+% RLVR reasoning \citep{wen2025rlvr}
+
+\subsection{LLM Game Evaluation}
+% lmgame-Bench \citep{hu2025lmgame}
+
+%% ─── 3. Methodology ────────────────────────────────────────────────
+\section{Methodology}
+\label{sec:method}
+
+\subsection{2048 Environment}
+% Game mechanics
+% State representation (16-channel binary for CNN, text for LLM)
+% Reward structure
+
+\subsection{Track A: Classical RL Agents}
+\subsubsection{DQN Agent}
+% CNN architecture
+% Experience replay, target networks
+% Hyperparameters
+
+\subsubsection{PPO Agent}
+% SB3 implementation
+% Custom feature extractor
+% Hyperparameters
+
+\subsection{Track B: LLM-RLVR Agent}
+\subsubsection{Model and Quantization}
+% Qwen2.5-0.5B-Instruct
+% Unsloth QLoRA 4-bit
+
+\subsubsection{Prompt Design}
+% System prompt
+% Board state representation
+% XML output format
+
+\subsubsection{GRPO Training}
+% Group Relative Policy Optimization
+% Multi-component reward function
+% Verifier design
+
+\subsubsection{Reward Function}
+% Table of reward components
+% Verifier mechanics
+
+%% ─── 4. Experiments ─────────────────────────────────────────────────
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Setup}
+% Hardware (RTX 4060, 6GB VRAM)
+% Training budgets
+% Evaluation protocol
+
+\subsection{Results}
+
+\subsubsection{Classical RL Performance}
+% DQN/PPO training curves
+% Max tile distributions
+% Score statistics
+
+\subsubsection{LLM-RLVR Performance}
+% GRPO training progress
+% Reasoning evolution
+% Score statistics
+
+\subsection{Comparative Analysis}
+% Side-by-side metrics table
+% Sample efficiency comparison
+% Reasoning quality assessment
+
+%% ─── 5. Discussion ──────────────────────────────────────────────────
+\section{Discussion}
+\label{sec:discussion}
+
+% Smarter vs. Faster hypothesis
+% Limitations
+% Future work
+
+%% ─── 6. Conclusion ──────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+%% ─── References ─────────────────────────────────────────────────────
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

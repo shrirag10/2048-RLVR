@@ -1,0 +1,21 @@
+# PPO Configuration — Stable-Baselines3
+# Uses same CNN architecture as DQN for fair comparison
+
+agent:
+  type: ppo
+  lr: 3.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  clip_range: 0.2
+
+training:
+  total_steps: 1000000
+  eval_freq: 10000
+  checkpoint_freq: 50000
+  reward_mode: score_delta
+  seed: 42
+
+environment:
+  size: 4

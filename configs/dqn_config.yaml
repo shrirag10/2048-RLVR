@@ -1,0 +1,24 @@
+# DQN Configuration — following Saligram et al. methodology
+# Reference: arXiv:2507.05465
+
+agent:
+  type: dqn
+  lr: 1.0e-4
+  gamma: 0.99
+  epsilon_start: 1.0
+  epsilon_end: 0.01
+  epsilon_decay_steps: 100000
+  buffer_size: 100000
+  batch_size: 64
+  target_sync_freq: 1000
+  grad_clip: 1.0
+
+training:
+  total_steps: 500000
+  eval_freq: 10000
+  checkpoint_freq: 50000
+  reward_mode: score_delta
+  seed: 42
+
+environment:
+  size: 4
