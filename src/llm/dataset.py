@@ -45,9 +45,12 @@ def create_grpo_dataset(
     records = []
     for state in raw_states:
         # Format as chat messages for the model
+        # Prefill assistant with <think> to kickstart CoT reasoning
+        # (following DeepSeek-R1, TinyZero, and Open-R1 best practices)
         messages = [
             {"role": "system", "content": state["system_prompt"]},
             {"role": "user", "content": state["user_prompt"]},
+            {"role": "assistant", "content": "<think>\n"},
         ]
 
         records.append({

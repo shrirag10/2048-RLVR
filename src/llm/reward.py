@@ -68,6 +68,29 @@ def _extract_text(completion) -> str:
 # or chat-format lists) and kwargs contain additional context.
 
 
+def length_reward_fn(completions, **kwargs) -> list[float]:
+    """
+    Soft reward for generating substantive completions.
+
+    Breaks the GRPO zero-variance trap by providing a gradient signal
+    even when format/direction rewards are all zero. Short degenerate
+    completions (< 10 words) get 0.0, longer ones scale up to 0.3.
+
+    This follows the DeepSeek-R1 principle: the model must first learn
+    to *generate text* before it can learn the correct *format*.
+    """
+    rewards = []
+    for completion in completions:
+        text = _extract_text(completion)
+        word_count = len(text.split())
+        # Gradual credit: 0.0 for <10 words, up to 0.3 for 50+ words
+        if word_count < 10:
+            rewards.append(0.0)
+        else:
+            rewards.append(min((word_count - 10) / 40.0 * 0.3, 0.3))
+    return rewards
+
+
 def format_reward_fn(completions, **kwargs) -> list[float]:
     """
     Reward for correct XML formatting.

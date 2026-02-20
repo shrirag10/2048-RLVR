@@ -27,6 +27,7 @@ from src.llm.reward import (
     direction_reward_fn,
     game_reward_fn,
     thinking_quality_reward_fn,
+    length_reward_fn,
 )
 
 
@@ -159,8 +160,17 @@ def train_grpo(
     print(f"  Output:          {output_dir}")
     print("=" * 60)
 
-    # ─── Step 1: Load model with Unsloth ───────────────────────────
-    print("\n[1/4] Loading model with Unsloth QLoRA 4-bit...")
+    # ─── Step 1: Generate dataset FIRST (before model load to save RAM) ─
+    print("\n[1/4] Generating 2048 board state dataset...")
+
+    dataset = create_grpo_dataset(n_states=dataset_size, seed=seed)
+
+    # Free memory from dataset generation before loading model
+    import gc
+    gc.collect()
+
+    # ─── Step 2: Load model with Unsloth ───────────────────────────
+    print("\n[2/4] Loading model with Unsloth QLoRA 4-bit...")
 
     from unsloth import FastLanguageModel
 
@@ -188,11 +198,6 @@ def train_grpo(
 
     print(f"  Model loaded. Trainable params: {model.print_trainable_parameters()}")
 
-    # ─── Step 2: Generate dataset ──────────────────────────────────
-    print("\n[2/4] Generating 2048 board state dataset...")
-
-    dataset = create_grpo_dataset(n_states=dataset_size, seed=seed)
-
     # ─── Step 3: Configure GRPO Trainer ────────────────────────────
     print("\n[3/4] Configuring GRPOTrainer...")
 
@@ -208,7 +213,7 @@ def train_grpo(
         gradient_accumulation_steps=gradient_accumulation_steps,
         num_train_epochs=num_train_epochs,
         max_steps=steps if steps else -1,
-        logging_steps=10,
+        logging_steps=1,
         save_steps=500,
         save_total_limit=3,
         seed=seed,
@@ -218,6 +223,13 @@ def train_grpo(
         lr_scheduler_type="cosine",
         report_to="none",  # Use our custom logging
         optim="adamw_8bit",
+        # Research-backed improvements:
+        temperature=0.9,          # High temp for diverse completions (TinyZero uses 1.0)
+        top_p=0.95,               # Nucleus sampling
+        num_iterations=2,         # Reuse samples for efficiency (Open-R1: 2-4)
+        # Reward weights: format > direction > length > game > thinking
+        # Prioritize format learning first since everything depends on it
+        reward_weights=[0.3, 0.3, 0.1, 0.2, 0.1],
     )
 
     # Create adapted game reward function
@@ -233,6 +245,7 @@ def train_grpo(
             direction_reward_fn,
             game_reward_adapted,
             thinking_quality_reward_fn,
+            length_reward_fn,
         ],
     )
 
