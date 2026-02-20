@@ -143,6 +143,9 @@ def train_grpo(
 
     os.makedirs(output_dir, exist_ok=True)
 
+    # Disable torch.compile to avoid graph break issues with Unsloth
+    os.environ["TORCHDYNAMO_DISABLE"] = "1"
+
     print("=" * 60)
     print("  GRPO Training Pipeline — 2048 LLM Agent")
     print("=" * 60)
@@ -199,6 +202,7 @@ def train_grpo(
         output_dir=output_dir,
         num_generations=num_generations,
         max_completion_length=max_completion_length,
+        max_prompt_length=256,  # Truncate/pad prompts uniformly
         learning_rate=learning_rate,
         per_device_train_batch_size=per_device_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,

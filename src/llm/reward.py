@@ -30,14 +30,45 @@ from src.env.game_2048 import Game2048
 from src.env.text_wrapper import parse_llm_response
 
 
+# ─── Completion Text Extraction ───────────────────────────────────────
+# TRL 0.24+ GRPOTrainer can pass completions in different formats:
+#   - list[str]: plain text completions
+#   - list[list[dict]]: chat-format completions (list of message dicts)
+# This helper normalizes both to plain strings.
+
+
+def _extract_text(completion) -> str:
+    """
+    Extract the text content from a TRL completion.
+
+    Handles:
+        - str: returned as-is
+        - list[dict]: extracts 'content' from the last message
+        - dict: extracts 'content' field
+    """
+    if isinstance(completion, str):
+        return completion
+    elif isinstance(completion, list):
+        # Chat format: list of {"role": ..., "content": ...}
+        if completion and isinstance(completion[0], dict):
+            # Get the assistant's (last) message content
+            return completion[-1].get("content", "")
+        # List of strings — join them
+        return " ".join(str(c) for c in completion)
+    elif isinstance(completion, dict):
+        return completion.get("content", str(completion))
+    else:
+        return str(completion)
+
+
 # ─── Individual Reward Functions ──────────────────────────────────────
 # Each function follows the TRL GRPOTrainer signature:
-#   reward_fn(completions: list[str], **kwargs) -> list[float]
-# where completions are the model's generated texts and kwargs contain
-# additional context (prompts, board states, etc.)
+#   reward_fn(completions, **kwargs) -> list[float]
+# where completions are the model's generated outputs (may be strings
+# or chat-format lists) and kwargs contain additional context.
 
 
-def format_reward_fn(completions: list[str], **kwargs) -> list[float]:
+def format_reward_fn(completions, **kwargs) -> list[float]:
     """
     Reward for correct XML formatting.
 
@@ -47,7 +78,8 @@ def format_reward_fn(completions: list[str], **kwargs) -> list[float]:
     """
     rewards = []
     for completion in completions:
-        parsed = parse_llm_response(completion)
+        text = _extract_text(completion)
+        parsed = parse_llm_response(text)
         if parsed.format_valid:
             rewards.append(0.5)
         elif parsed.thinking is not None or parsed.action is not None:
@@ -57,7 +89,7 @@ def format_reward_fn(completions: list[str], **kwargs) -> list[float]:
     return rewards
 
 
-def direction_reward_fn(completions: list[str], **kwargs) -> list[float]:
+def direction_reward_fn(completions, **kwargs) -> list[float]:
     """
     Reward for valid direction in <answer> tag.
 
@@ -66,7 +98,8 @@ def direction_reward_fn(completions: list[str], **kwargs) -> list[float]:
     """
     rewards = []
     for completion in completions:
-        parsed = parse_llm_response(completion)
+        text = _extract_text(completion)
+        parsed = parse_llm_response(text)
         rewards.append(0.5 if parsed.direction_valid else 0.0)
     return rewards
 
@@ -100,7 +133,8 @@ def game_reward_fn(
         return [0.0] * len(completions)
 
     for i, completion in enumerate(completions):
-        parsed = parse_llm_response(completion)
+        text = _extract_text(completion)
+        parsed = parse_llm_response(text)
         reward = 0.0
 
         if parsed.action_id is None:
@@ -162,7 +196,7 @@ def game_reward_fn(
     return rewards
 
 
-def thinking_quality_reward_fn(completions: list[str], **kwargs) -> list[float]:
+def thinking_quality_reward_fn(completions, **kwargs) -> list[float]:
     """
     Reward for reasoning quality in the <think> block.
 
@@ -182,7 +216,8 @@ def thinking_quality_reward_fn(completions: list[str], **kwargs) -> list[float]:
 
     rewards = []
     for completion in completions:
-        parsed = parse_llm_response(completion)
+        text = _extract_text(completion)
+        parsed = parse_llm_response(text)
         reward = 0.0
 
         if parsed.thinking is None:
