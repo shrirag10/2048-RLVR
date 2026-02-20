@@ -15,6 +15,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
@@ -104,7 +105,7 @@ class MetricsCallback(BaseCallback):
         if self.num_timesteps % self.eval_freq == 0 and self.verbose:
             summary = self.logger_obj.get_summary(last_n=50)
             if summary:
-                print(
+                tqdm.write(
                     f"  Step {self.num_timesteps:>7,} | Ep {self.episode_num:>5} | "
                     f"Avg Score: {summary['avg_score']:>7.0f} | "
                     f"Max Tile: {summary['max_tile_ever']:>5} | "
@@ -188,8 +189,21 @@ def train_ppo(
     print(f"║  Reward: {reward_mode}                    ║")
     print(f"╚══════════════════════════════════════════╝")
 
-    # Train
-    model.learn(total_timesteps=total_steps, callback=callback)
+    # Train with progress bar
+    pbar = tqdm(total=total_steps, desc="PPO Training", unit="step",
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]")
+
+    class ProgressCallback(BaseCallback):
+        """Updates tqdm progress bar."""
+        def _on_step(self):
+            pbar.update(self.model.n_envs)
+            return True
+
+    model.learn(
+        total_timesteps=total_steps,
+        callback=[callback, ProgressCallback()],
+    )
+    pbar.close()
 
     # Final save
     model.save(os.path.join(log_dir, "ppo_final"))

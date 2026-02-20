@@ -26,6 +26,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from tqdm import tqdm
 
 from src.env.gym_wrapper import Gym2048Env
 from src.utils.metrics import EpisodeMetrics, TrainingLogger
@@ -330,7 +331,8 @@ def train_dqn(
     episode_start = time.time()
     episode_num = 0
 
-    for step in range(1, total_steps + 1):
+    for step in tqdm(range(1, total_steps + 1), desc="DQN Training", unit="step",
+                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"):
         agent.steps_done = step
 
         # Select and execute action
@@ -391,7 +393,7 @@ def train_dqn(
         if step % eval_freq == 0:
             summary = logger.get_summary(last_n=50)
             if summary:
-                print(
+                tqdm.write(
                     f"  Step {step:>7,} | Ep {episode_num:>5} | "
                     f"ε={agent.epsilon:.3f} | "
                     f"Avg Score: {summary['avg_score']:>7.0f} | "
