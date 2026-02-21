@@ -1,7 +1,7 @@
 """
 Classical RL training and evaluation scripts.
 
-Provides a unified CLI for training and evaluating DQN and PPO agents.
+Provides a unified CLI for training and evaluating DQN, PPO, A2C, QR-DQN, and SAC agents.
 """
 
 from __future__ import annotations
@@ -79,9 +79,46 @@ def evaluate_agent(
             )
             logger.log_episode(metrics)
 
-    elif agent_type == "ppo":
-        from stable_baselines3 import PPO
-        model = PPO.load(model_path)
+    elif agent_type == "sac":
+        from src.classical.sac_agent import DiscreteSACAgent
+        agent = DiscreteSACAgent()
+        agent.load(model_path)
+
+        for ep in range(1, n_episodes + 1):
+            obs, info = env.reset()
+            done = False
+            moves = 0
+            start = time.time()
+
+            while not done:
+                valid_actions = info.get("valid_actions", list(range(4)))
+                action = agent.select_action(obs, valid_actions, deterministic=True)
+                obs, _, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+                moves += 1
+
+            metrics = EpisodeMetrics(
+                episode=ep,
+                total_score=info.get("score", 0),
+                max_tile=info.get("max_tile", 0),
+                num_moves=moves,
+                valid_moves=moves,
+                invalid_moves=0,
+                wall_clock_seconds=time.time() - start,
+            )
+            logger.log_episode(metrics)
+
+    elif agent_type in ("ppo", "a2c", "qrdqn"):
+        if agent_type == "ppo":
+            from stable_baselines3 import PPO
+            model = PPO.load(model_path)
+        elif agent_type == "a2c":
+            from stable_baselines3 import A2C
+            model = A2C.load(model_path)
+        else:  # qrdqn
+            from sb3_contrib import QRDQN
+            model = QRDQN.load(model_path)
+
 
         for ep in range(1, n_episodes + 1):
             obs, info = env.reset()
@@ -118,7 +155,7 @@ def main():
     # Train command
     train_p = sub.add_parser("train", help="Train an agent")
     train_p.add_argument(
-        "--agent", choices=["dqn", "ppo"], required=True, help="Agent type"
+        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type"
     )
     train_p.add_argument(
         "--steps", type=int, default=500_000, help="Total training steps"
@@ -135,7 +172,7 @@ def main():
     # Eval command
     eval_p = sub.add_parser("eval", help="Evaluate a trained agent")
     eval_p.add_argument(
-        "--agent", choices=["dqn", "ppo"], required=True, help="Agent type"
+        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type"
     )
     eval_p.add_argument("--model", required=True, help="Path to model file")
     eval_p.add_argument("--episodes", type=int, default=100)
@@ -165,6 +202,42 @@ def main():
             if args.lr:
                 kwargs["lr"] = args.lr
             train_ppo(
+                total_steps=args.steps,
+                log_dir=log_dir,
+                reward_mode=args.reward,
+                seed=args.seed,
+                **kwargs,
+            )
+        elif args.agent == "a2c":
+            from src.classical.a2c_agent import train_a2c
+            kwargs = {}
+            if args.lr:
+                kwargs["lr"] = args.lr
+            train_a2c(
+                total_steps=args.steps,
+                log_dir=log_dir,
+                reward_mode=args.reward,
+                seed=args.seed,
+                **kwargs,
+            )
+        elif args.agent == "qrdqn":
+            from src.classical.qrdqn_agent import train_qrdqn
+            kwargs = {}
+            if args.lr:
+                kwargs["lr"] = args.lr
+            train_qrdqn(
+                total_steps=args.steps,
+                log_dir=log_dir,
+                reward_mode=args.reward,
+                seed=args.seed,
+                **kwargs,
+            )
+        elif args.agent == "sac":
+            from src.classical.sac_agent import train_sac
+            kwargs = {}
+            if args.lr:
+                kwargs["lr"] = args.lr
+            train_sac(
                 total_steps=args.steps,
                 log_dir=log_dir,
                 reward_mode=args.reward,
