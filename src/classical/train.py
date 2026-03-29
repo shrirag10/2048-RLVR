@@ -155,7 +155,7 @@ def main():
     # Train command
     train_p = sub.add_parser("train", help="Train an agent")
     train_p.add_argument(
-        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type"
+        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac", "lfa"], required=True, help="Agent type"
     )
     train_p.add_argument(
         "--steps", type=int, default=500_000, help="Total training steps"
@@ -168,17 +168,32 @@ def main():
     train_p.add_argument("--seed", type=int, default=42)
     train_p.add_argument("--log-dir", default="logs")
     train_p.add_argument("--lr", type=float, default=None)
+    train_p.add_argument(
+        "--num-envs", type=int, default=None,
+        help="Number of parallel envs (default: 8 for on-policy, 4 for off-policy)"
+    )
 
     # Eval command
     eval_p = sub.add_parser("eval", help="Evaluate a trained agent")
-    eval_p.add_argument(
-        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type"
-    )
+    eval_p.add_argument("--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type")
     eval_p.add_argument("--model", required=True, help="Path to model file")
     eval_p.add_argument("--episodes", type=int, default=100)
     eval_p.add_argument("--seed", type=int, default=42)
     eval_p.add_argument("--render", action="store_true")
     eval_p.add_argument("--log-dir", default="logs/eval")
+
+    # Replay command — records board states + action probs for frontend playback
+    replay_p = sub.add_parser("replay", help="Generate replay JSON from a trained checkpoint")
+    replay_p.add_argument(
+        "--agent", choices=["dqn", "ppo", "a2c", "qrdqn", "sac"], required=True, help="Agent type"
+    )
+    replay_p.add_argument("--model", required=True, help="Path to trained model checkpoint")
+    replay_p.add_argument("--episodes", type=int, default=10, help="Number of episodes to record")
+    replay_p.add_argument("--seed", type=int, default=0)
+    replay_p.add_argument(
+        "--output", default=None,
+        help="Output path for replays.json (default: same dir as --model)"
+    )
 
     args = parser.parse_args()
 
@@ -189,6 +204,10 @@ def main():
             kwargs = {}
             if args.lr:
                 kwargs["lr"] = args.lr
+            if args.num_envs is not None:
+                kwargs["n_envs"] = args.num_envs
+            else:
+                kwargs["n_envs"] = 4
             train_dqn(
                 total_steps=args.steps,
                 log_dir=log_dir,
@@ -201,6 +220,10 @@ def main():
             kwargs = {}
             if args.lr:
                 kwargs["lr"] = args.lr
+            if args.num_envs is not None:
+                kwargs["n_envs"] = args.num_envs
+            else:
+                kwargs["n_envs"] = 8
             train_ppo(
                 total_steps=args.steps,
                 log_dir=log_dir,
@@ -213,6 +236,10 @@ def main():
             kwargs = {}
             if args.lr:
                 kwargs["lr"] = args.lr
+            if args.num_envs is not None:
+                kwargs["n_envs"] = args.num_envs
+            else:
+                kwargs["n_envs"] = 8
             train_a2c(
                 total_steps=args.steps,
                 log_dir=log_dir,
@@ -225,6 +252,10 @@ def main():
             kwargs = {}
             if args.lr:
                 kwargs["lr"] = args.lr
+            if args.num_envs is not None:
+                kwargs["n_envs"] = args.num_envs
+            else:
+                kwargs["n_envs"] = 4
             train_qrdqn(
                 total_steps=args.steps,
                 log_dir=log_dir,
@@ -237,7 +268,23 @@ def main():
             kwargs = {}
             if args.lr:
                 kwargs["lr"] = args.lr
+            if args.num_envs is not None:
+                kwargs["n_envs"] = args.num_envs
+            else:
+                kwargs["n_envs"] = 4
             train_sac(
+                total_steps=args.steps,
+                log_dir=log_dir,
+                reward_mode=args.reward,
+                seed=args.seed,
+                **kwargs,
+            )
+        elif args.agent == "lfa":
+            from src.classical.lfa_agent import train_lfa
+            kwargs = {}
+            if args.lr:
+                kwargs["alpha"] = args.lr
+            train_lfa(
                 total_steps=args.steps,
                 log_dir=log_dir,
                 reward_mode=args.reward,
@@ -257,6 +304,16 @@ def main():
         print("\nEvaluation Results:")
         for k, v in summary.items():
             print(f"  {k}: {v}")
+
+    elif args.command == "replay":
+        from src.classical.replay_gen import generate_replays
+        generate_replays(
+            agent_type=args.agent,
+            model_path=args.model,
+            n_episodes=args.episodes,
+            seed=args.seed,
+            output_path=args.output,
+        )
 
     else:
         parser.print_help()

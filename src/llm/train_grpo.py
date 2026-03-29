@@ -100,7 +100,7 @@ def train_grpo(
     gradient_accumulation_steps: int = 4,
     lora_r: int = 16,
     lora_alpha: int = 16,
-    max_seq_length: int = 512,
+    max_seq_length: int = 1024,
     output_dir: str = "logs/grpo",
     seed: int = 42,
     config_path: Optional[str] = None,
@@ -132,15 +132,43 @@ def train_grpo(
         config_path: Optional YAML config file to override defaults.
         steps: Optional max training steps (overrides epochs).
     """
-    # Load config overrides if provided
+    # Collect all params into a dict so YAML overrides actually apply
+    cfg = dict(
+        model_name=model_name, dataset_size=dataset_size,
+        num_generations=num_generations, max_completion_length=max_completion_length,
+        learning_rate=learning_rate, num_train_epochs=num_train_epochs,
+        per_device_batch_size=per_device_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        lora_r=lora_r, lora_alpha=lora_alpha, max_seq_length=max_seq_length,
+        output_dir=output_dir, seed=seed, steps=steps,
+    )
+
+    # Load config overrides — mutating cfg directly works correctly
     if config_path and os.path.exists(config_path):
         with open(config_path) as f:
-            config = yaml.safe_load(f)
-        # Override defaults with config values
-        locals_copy = locals()
-        for key, value in config.items():
-            if key in locals_copy and key != "config_path":
-                locals_copy[key] = value
+            overrides = yaml.safe_load(f) or {}
+        unknown = set(overrides) - set(cfg)
+        if unknown:
+            print(f"  [warn] Unknown config keys ignored: {unknown}")
+        cfg.update({k: v for k, v in overrides.items() if k in cfg})
+        print(f"  [config] Loaded overrides from {config_path}: "
+              f"{[k for k in overrides if k in cfg]}")
+
+    # Unpack cfg back to named variables for readability below
+    model_name             = cfg["model_name"]
+    dataset_size           = cfg["dataset_size"]
+    num_generations        = cfg["num_generations"]
+    max_completion_length  = cfg["max_completion_length"]
+    learning_rate          = cfg["learning_rate"]
+    num_train_epochs       = cfg["num_train_epochs"]
+    per_device_batch_size  = cfg["per_device_batch_size"]
+    gradient_accumulation_steps = cfg["gradient_accumulation_steps"]
+    lora_r                 = cfg["lora_r"]
+    lora_alpha             = cfg["lora_alpha"]
+    max_seq_length         = cfg["max_seq_length"]
+    output_dir             = cfg["output_dir"]
+    seed                   = cfg["seed"]
+    steps                  = cfg["steps"]
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -207,7 +235,7 @@ def train_grpo(
         output_dir=output_dir,
         num_generations=num_generations,
         max_completion_length=max_completion_length,
-        max_prompt_length=256,  # Truncate/pad prompts uniformly
+        max_prompt_length=512,  # Prompts run ~400 tokens; give headroom
         learning_rate=learning_rate,
         per_device_train_batch_size=per_device_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
@@ -252,6 +280,54 @@ def train_grpo(
     # ─── Step 4: Train ─────────────────────────────────────────────
     print("\n[4/4] Training...")
     start_time = time.time()
+
+    # Progress callback — tqdm bar + per-step reward/loss logging
+    from transformers import TrainerCallback
+    from tqdm import tqdm
+
+    total_steps = trainer.args.max_steps if trainer.args.max_steps > 0 else (
+        len(dataset) // (per_device_batch_size * gradient_accumulation_steps * num_generations)
+        * num_train_epochs
+    )
+
+    class GRPOProgressCallback(TrainerCallback):
+        def __init__(self):
+            self.bar = tqdm(total=total_steps, desc="  GRPO", unit="step",
+                            dynamic_ncols=True, colour="green")
+            self._log_path = os.path.join(output_dir, "train_log.jsonl")
+            # clear previous log
+            open(self._log_path, "w").close()
+
+        def on_log(self, _args, state, _control, logs=None, **kwargs):
+            if not logs:
+                return
+            step = state.global_step
+            loss    = logs.get("loss", logs.get("train_loss"))
+            reward  = logs.get("reward", logs.get("rewards/mean"))
+            fmt_r   = logs.get("rewards/format_reward_fn")
+            dir_r   = logs.get("rewards/direction_reward_fn")
+            elapsed = time.time() - start_time
+
+            postfix = {}
+            if loss   is not None: postfix["loss"]   = f"{loss:.4f}"
+            if reward is not None: postfix["reward"] = f"{reward:.3f}"
+            if fmt_r  is not None: postfix["fmt"]    = f"{fmt_r:.2f}"
+            if dir_r  is not None: postfix["dir"]    = f"{dir_r:.2f}"
+            self.bar.set_postfix(postfix, refresh=False)
+            self.bar.update(max(0, step - self.bar.n))
+
+            # Append to jsonl log
+            record = {"step": step, "elapsed": round(elapsed, 1), **{
+                k: round(v, 5) if isinstance(v, float) else v
+                for k, v in logs.items()
+            }}
+            with open(self._log_path, "a") as f:
+                f.write(json.dumps(record) + "\n")
+
+        def on_train_end(self, _args, _state, _control, **kwargs):
+            self.bar.close()
+
+    trainer.add_callback(GRPOProgressCallback())
 
     trainer.train()
 

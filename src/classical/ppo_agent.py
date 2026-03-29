@@ -130,14 +130,16 @@ def train_ppo(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/ppo",
-    reward_mode: str = "score_delta",
+    reward_mode: str = "log_score",      # log reward → dense gradient at ALL tile levels
     seed: int = 42,
-    lr: float = 3e-4,
-    n_steps: int = 2048,
-    batch_size: int = 64,
-    n_epochs: int = 10,
-    gamma: float = 0.99,
+    lr: float = 2e-4,                     # slightly lower for stability
+    n_steps: int = 4096,                  # longer rollouts capture full 2048 episodes
+    batch_size: int = 256,                # larger batch = stabler gradients
+    n_epochs: int = 4,                   # fewer epochs → less overfitting
+    gamma: float = 0.995,                 # higher discount for long-horizon
     clip_range: float = 0.2,
+    ent_coef: float = 0.01,               # entropy bonus prevents premature collapse
+    n_envs: int = 8,
     device: str = "auto",
 ) -> PPO:
     """
@@ -148,13 +150,25 @@ def train_ppo(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    # Create environment
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    # Create vectorized environments
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+    import src.env.gym_wrapper  # ensure "Game2048-v0" is registered in each subprocess
 
-    # Custom policy kwargs
+    vec_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    env = make_vec_env(
+        "Game2048-v0",
+        n_envs=n_envs,
+        env_kwargs={"reward_mode": reward_mode},
+        vec_env_cls=vec_cls,
+        seed=seed,
+    )
+
+    # Bigger feature extractor for harder task
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
-        "features_extractor_kwargs": {"features_dim": 256},
+        "features_extractor_kwargs": {"features_dim": 512},
+        "net_arch": [{"pi": [256, 256], "vf": [256, 256]}],
     }
 
     # Create PPO model
@@ -167,6 +181,7 @@ def train_ppo(
         n_epochs=n_epochs,
         gamma=gamma,
         clip_range=clip_range,
+        ent_coef=ent_coef,                # keep entropy alive
         policy_kwargs=policy_kwargs,
         verbose=0,
         seed=seed,
@@ -187,6 +202,7 @@ def train_ppo(
     print(f"║  PPO Training — {total_steps:,} steps              ║")
     print(f"║  Device: {model.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
 
     # Train with progress bar

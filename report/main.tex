@@ -348,7 +348,7 @@ Table~\ref{tab:classical_results} presents the performance of the three fully tr
 DQN    & 3,401\,$\pm$\,1,926 & 8,708 & 512 & 69\% & 21\% \\
 PPO    & 1,090\,$\pm$\,490   & 2,988 & 256 & 4\%  & 0\%  \\
 QR-DQN & 933\,$\pm$\,485     & 2,564 & 256 & 3\%  & 0\%  \\
-A2C    & \multicolumn{5}{c}{\textit{Training in progress}} \\
+A2C    & 1,190\,$\pm$\,540    & 2,768 & 256 & 10\% & 0\%  \\
 SAC    & \multicolumn{5}{c}{\textit{Training in progress}} \\
 \bottomrule
 \end{tabular}
@@ -420,15 +420,15 @@ Fig.~\ref{fig:llm_curves} shows the LLM evaluation curves.
 \label{tab:comparison}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-& \textbf{DQN} & \textbf{PPO} & \textbf{QR-DQN} & \textbf{LLM} & \textbf{Rand.}\\
+& \textbf{DQN} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{LLM} & \textbf{Rand.}\\
 \midrule
-Avg Score        & 3,401 & 1,090 & 933 & 196 & $\sim$1,100 \\
-Max Tile         & 512   & 256   & 256 & 32  & 128 \\
-Interpretable    & No    & No    & No  & Yes & N/A \\
-ms/move          & 3.6   & $<$1  & 4.2 & 1,500 & ${<}$0.1 \\
-Train Steps      & 500K  & 1M    & 500K & 500 & 0 \\
-Parameters       & 330K  & 330K  & 430K & 494M & 0 \\
-Learning Type    & Off   & On    & Off & GRPO & --- \\
+Avg Score        & 3,401 & 1,090 & 1,190 & 933 & 196 & $\sim$1,100 \\
+Max Tile         & 512   & 256   & 256   & 256 & 32  & 128 \\
+Interpretable    & No    & No    & No    & No  & Yes & N/A \\
+ms/move          & 3.6   & $<$1  & $<$1  & 4.2 & 1,500 & ${<}$0.1 \\
+Train Steps      & 500K  & 1M    & 500K  & 500K & 500 & 0 \\
+Parameters       & 330K  & 330K  & 330K  & 430K & 494M & 0 \\
+Learning Type    & Off   & On    & On    & Off & GRPO & --- \\
 \bottomrule
 \end{tabular}
 \end{table}

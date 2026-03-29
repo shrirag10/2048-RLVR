@@ -128,18 +128,19 @@ def train_qrdqn(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/qrdqn",
-    reward_mode: str = "score_delta",
+    reward_mode: str = "log_score",           # dense signal at all tile levels
     seed: int = 42,
-    lr: float = 1e-4,
-    buffer_size: int = 100_000,
-    batch_size: int = 64,
-    gamma: float = 0.99,
-    exploration_fraction: float = 0.2,
+    lr: float = 5e-5,                          # lower LR stabilises distributional loss
+    buffer_size: int = 300_000,                # 3x bigger: diverse replay
+    batch_size: int = 128,                     # larger batch for quantile regression
+    gamma: float = 0.995,                      # long-horizon discount
+    exploration_fraction: float = 0.5,         # explore longer
     exploration_final_eps: float = 0.01,
-    n_quantiles: int = 50,
-    target_update_interval: int = 1000,
-    train_freq: int = 4,
-    learning_starts: int = 5000,
+    n_quantiles: int = 100,                    # finer return distribution
+    target_update_interval: int = 500,         # sync target more often
+    train_freq: int = 1,                       # update every step
+    learning_starts: int = 10_000,
+    n_envs: int = 4,
     device: str = "auto",
 ) -> QRDQN:
     """
@@ -153,11 +154,22 @@ def train_qrdqn(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+    import src.env.gym_wrapper  # ensure registration in subprocesses
+
+    vec_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    env = make_vec_env(
+        "Game2048-v0",
+        n_envs=n_envs,
+        env_kwargs={"reward_mode": reward_mode},
+        vec_env_cls=vec_cls,
+        seed=seed,
+    )
 
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
-        "features_extractor_kwargs": {"features_dim": 256},
+        "features_extractor_kwargs": {"features_dim": 512},  # bigger extractor
         "n_quantiles": n_quantiles,
     }
 
@@ -193,6 +205,7 @@ def train_qrdqn(
     print(f"║  Quantiles: {n_quantiles}                           ║")
     print(f"║  Device: {model.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
 
     pbar = tqdm(total=total_steps, desc="QR-DQN Training", unit="step",
