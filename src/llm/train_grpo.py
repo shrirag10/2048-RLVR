@@ -17,7 +17,6 @@ import json
 import time
 from typing import Optional
 
-import numpy as np
 import torch
 import yaml
 
@@ -26,8 +25,6 @@ from src.llm.reward import (
     format_reward_fn,
     direction_reward_fn,
     game_reward_fn,
-    thinking_quality_reward_fn,
-    length_reward_fn,
 )
 
 
@@ -92,15 +89,15 @@ def make_game_reward_adapter(dataset):
 def train_grpo(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
     dataset_size: int = 10_000,
-    num_generations: int = 8,
-    max_completion_length: int = 256,
-    learning_rate: float = 5e-6,
+    num_generations: int = 4,
+    max_completion_length: int = 128,
+    learning_rate: float = 1e-6,
     num_train_epochs: int = 3,
     per_device_batch_size: int = 1,
-    gradient_accumulation_steps: int = 4,
+    gradient_accumulation_steps: int = 2,
     lora_r: int = 16,
     lora_alpha: int = 16,
-    max_seq_length: int = 1024,
+    max_seq_length: int = 640,  # MUST equal max_prompt_length + max_completion_length exactly
     output_dir: str = "logs/grpo",
     seed: int = 42,
     config_path: Optional[str] = None,
@@ -251,18 +248,17 @@ def train_grpo(
         lr_scheduler_type="cosine",
         report_to="none",  # Use our custom logging
         optim="adamw_8bit",
-        # Research-backed improvements:
-        temperature=0.9,          # High temp for diverse completions (TinyZero uses 1.0)
-        top_p=0.95,               # Nucleus sampling
-        num_iterations=2,         # Reuse samples for efficiency (Open-R1: 2-4)
-        # Reward weights: format > direction > length > game > thinking
-        # Prioritize format learning first since everything depends on it
-        reward_weights=[0.3, 0.3, 0.1, 0.2, 0.1],
+        num_iterations=1,         # 2+ causes completion length drift in Unsloth GRPO
+        temperature=0.9,
+        beta=0.04,
+        max_grad_norm=0.5,        # clip exploding gradients
+        # Format first, direction second — game reward removed until format is learned
+        reward_weights=[0.6, 0.4],
     )
 
-    # Create adapted game reward function
-    game_reward_adapted = make_game_reward_adapter(dataset)
-
+    # NOTE: Do NOT pass a separate GenerationConfig — it conflicts with Unsloth's
+    # GRPO compiled kernel and causes completion_mask size mismatches at runtime.
+    # generation temperature/top_p are set directly in GRPOConfig above.
     trainer = GRPOTrainer(
         model=model,
         args=training_args,
@@ -271,11 +267,26 @@ def train_grpo(
         reward_funcs=[
             format_reward_fn,
             direction_reward_fn,
-            game_reward_adapted,
-            thinking_quality_reward_fn,
-            length_reward_fn,
         ],
     )
+
+    # ── Monkey-patch: fix Unsloth 2026.2.1 completion_mask / completion_ids
+    # shape mismatch.  The compiled GRPO kernel creates completion_mask with
+    # width == max_completion_length, but generated completions can be a few
+    # tokens longer due to BOS/EOS handling.  Truncate everything to match.
+    _orig_prepare = trainer._prepare_inputs
+
+    def _patched_prepare(inputs):
+        inputs = _orig_prepare(inputs)
+        mask_len = inputs["completion_mask"].shape[1]
+        for key in ("completion_ids", "old_per_token_logps",
+                     "ref_per_token_logps", "sampling_per_token_logps"):
+            if key in inputs and inputs[key] is not None:
+                if inputs[key].shape[1] > mask_len:
+                    inputs[key] = inputs[key][:, :mask_len]
+        return inputs
+
+    trainer._prepare_inputs = _patched_prepare
 
     # ─── Step 4: Train ─────────────────────────────────────────────
     print("\n[4/4] Training...")
@@ -375,13 +386,13 @@ def main():
     parser = argparse.ArgumentParser(description="GRPO Training for 2048 LLM Agent")
     parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
     parser.add_argument("--dataset-size", type=int, default=10_000)
-    parser.add_argument("--num-generations", type=int, default=8)
-    parser.add_argument("--max-completion", type=int, default=256)
+    parser.add_argument("--num-generations", type=int, default=4)
+    parser.add_argument("--max-completion", type=int, default=128)
     parser.add_argument("--lr", type=float, default=5e-6)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--grad-accum", type=int, default=4)
+    parser.add_argument("--grad-accum", type=int, default=2)
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=16)
     parser.add_argument("--output-dir", default="logs/grpo")

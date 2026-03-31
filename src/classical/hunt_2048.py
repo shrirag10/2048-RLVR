@@ -236,7 +236,7 @@ def hunt(agent_id: str, ckpt: str, display: str, log_dir: str):
     bar = tqdm(desc=f"  {display:6}", unit="ep", dynamic_ncols=True, colour="cyan")
 
     for attempt in itertools.count():
-        env = Gym2048Env(seed=attempt)
+        env = Gym2048Env(seed=attempt, max_steps=5000)
         try:
             steps, tile = runners[agent_id](model, env)
         finally:

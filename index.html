@@ -586,11 +586,13 @@ function showView(v){
    BENCHMARK DATA & CHARTS  — real CSV data
 ═════════════════════════════════════════════════════════ */
 const AGENT_DEFS = [
-  {id:'dqn',   name:'DQN',    color:'#5b5c59'},
-  {id:'ppo',   name:'PPO',    color:'#705900'},
-  {id:'a2c',   name:'A2C',    color:'#aeadaa'},
-  {id:'qrdqn', name:'QR-DQN', color:'#ac292e'},
-  {id:'sac',   name:'SAC',    color:'#9b1c24'},
+  {id:'dqn',   name:'DQN',          color:'#5b5c59'},
+  {id:'ppo',   name:'PPO',          color:'#705900'},
+  {id:'a2c',   name:'A2C',          color:'#aeadaa'},
+  {id:'qrdqn', name:'QR-DQN',       color:'#ac292e'},
+  {id:'sac',   name:'SAC',          color:'#9b1c24'},
+  {id:'lfa',   name:'LFA',          color:'#1a6b3a'},
+  {id:'grpo',  name:'GRPO (Qwen2.5)',color:'#6b21a8'},
 ];
 
 function _parseCSV(text) {
@@ -956,6 +958,7 @@ const AGENT_COLORS = {
   qrdqn: '#ac292e',
   sac:   '#9b1c24',
   lfa:   '#1a6b3a',
+  grpo:  '#6b21a8',
 };
 
 function setReplayMode(mode) {

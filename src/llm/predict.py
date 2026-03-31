@@ -188,10 +188,12 @@ def generate_move(
         add_generation_prompt=True,
         return_tensors="pt",
     ).to(model.device)
+    attention_mask = (input_ids != tokenizer.eos_token_id).long()
 
     with torch.no_grad():
         outputs = model.generate(
             input_ids=input_ids,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             min_new_tokens=10,  # Prevent immediate EOS
             temperature=temperature,
