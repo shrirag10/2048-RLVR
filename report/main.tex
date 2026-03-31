@@ -211,6 +211,22 @@ where $\alpha>0$ is a temperature parameter controlling the trade-off between re
 \end{equation}
 Target Q-networks are updated via Polyak averaging $\bar{\psi}\leftarrow\tau\psi+(1-\tau)\bar{\psi}$ with $\tau{=}0.005$.
 
+\subsection{Linear Function Approximation (LFA)}
+\label{sec:lfa}
+
+As a non-neural baseline, we implement semi-gradient SARSA with linear function approximation following Sutton and Barto (Chapters 9--10). The agent maintains a weight matrix $\mathbf{w}\in\mathbb{R}^{4\times 27}$ mapping a hand-crafted feature vector $\phi(s)\in\mathbb{R}^{27}$ to Q-values for each action:
+\begin{equation}
+    \hat{q}(s,a,\mathbf{w})=\mathbf{w}_a^\top\phi(s)
+\end{equation}
+
+The feature vector $\phi(s)$ encodes 27 dimensions: 16 log-normalized tile values ($\log_2(\text{tile})/17$), 1 empty-cell ratio, 1 merge potential, 4 monotonicity scores (horizontal/vertical row/column gradients), 1 max-tile indicator, 1 corner bonus, and 3 tile distribution statistics (low/mid/high ratios).
+
+Updates follow the SARSA TD(0) rule:
+\begin{equation}
+    \mathbf{w}_{a_t}\leftarrow\mathbf{w}_{a_t}+\alpha\delta_t\phi(s_t),\quad \delta_t=r_t+\gamma\hat{q}(s_{t+1},a_{t+1})-\hat{q}(s_t,a_t)
+\end{equation}
+with step-size $\alpha{=}5\times10^{-4}$ and $\gamma{=}0.99$. Exploration uses $\varepsilon$-greedy with decay factor 0.9999 per step.
+
 \subsection{LLM Agent: GRPO Training}
 \label{sec:grpo}
 
@@ -331,86 +347,98 @@ LLM (GRPO) & 1,500  & GPU & 494M \\
 
 \subsection{Setup}
 
-All experiments were conducted on a workstation equipped with an NVIDIA RTX 4060 GPU (8\,GB VRAM) and an AMD Ryzen CPU. Classical agents were trained for 500K environment steps (DQN, QR-DQN, SAC) or 1M steps (PPO, A2C) using the score-delta reward mode. DQN and SAC use our custom PyTorch implementations; PPO and A2C use Stable-Baselines3~\cite{raffin2021stable}; QR-DQN uses SB3-Contrib. The LLM agent was trained for 500 GRPO steps on a dataset of 5,000 game-state prompts with $G{=}8$ completions per prompt. No hyperparameter search was conducted; all values follow the recommendations in the cited papers or the respective library defaults.
+All experiments were conducted on a laptop equipped with an NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM) running Ubuntu 22.04 with CUDA 12.6. All six classical agents were trained for 1M environment steps using the shaped reward mode, which augments the score-delta signal with milestone bonuses (+50 at 256, +100 at 512, +200 at 1024, +500 at 2048). DQN and SAC use our custom PyTorch implementations; PPO and A2C use Stable-Baselines3~\cite{raffin2021stable}; QR-DQN uses SB3-Contrib; LFA is a pure NumPy implementation. The LLM agent was trained for 300 GRPO steps on a dataset of 500 game-state prompts with $G{=}4$ completions per prompt using Unsloth QLoRA 4-bit. Additionally, we evaluate agents in a ``hunt'' mode where each agent plays unlimited episodes with stochastic action selection until the 2048 tile is reached. No hyperparameter search was conducted; all values follow the recommendations in the cited papers or the respective library defaults.
 
 \subsection{Classical RL Results}
 
-Table~\ref{tab:classical_results} presents the performance of the three fully trained classical agents evaluated over their last 100 training episodes.
+Table~\ref{tab:classical_results} presents the performance of all six classical agents evaluated over their last 100 training episodes (1M steps, shaped reward).
 
 \begin{table}[t]
 \centering
-\caption{Classical Agent Performance (Last 100 Training Episodes)}
+\caption{Classical Agent Performance (Last 100 Episodes, 1M Steps, Shaped Reward)}
 \label{tab:classical_results}
-\begin{tabular}{@{}lrrrrr@{}}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-\textbf{Agent} & \textbf{Avg Score} & \textbf{Max Score} & \textbf{Max Tile} & \textbf{256+} & \textbf{512+} \\
+\textbf{Agent} & \textbf{Avg Score} & \textbf{Max Score} & \textbf{Max Tile} & \textbf{256+} & \textbf{512+} & \textbf{1024+} \\
 \midrule
-DQN    & 3,401\,$\pm$\,1,926 & 8,708 & 512 & 69\% & 21\% \\
-PPO    & 1,090\,$\pm$\,490   & 2,988 & 256 & 4\%  & 0\%  \\
-QR-DQN & 933\,$\pm$\,485     & 2,564 & 256 & 3\%  & 0\%  \\
-A2C    & 1,190\,$\pm$\,540    & 2,768 & 256 & 10\% & 0\%  \\
-SAC    & \multicolumn{5}{c}{\textit{Training in progress}} \\
+DQN    & 6,384 & 14,050 & 1024 & 92\% & 67\% & 10\% \\
+LFA    & 2,455 & 10,208 & 1024 & 45\% & 9\%  & 1\% \\
+A2C    & 1,205 & 2,856  & 256  & 14\% & 0\%  & 0\% \\
+SAC    & 1,132 & 4,814  & 512  & 6\%  & 1\%  & 0\% \\
+PPO    & 1,038 & 3,040  & 256  & 7\%  & 0\%  & 0\% \\
+QR-DQN & 782   & 2,176  & 256  & 2\%  & 0\%  & 0\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{DQN dominance.} DQN substantially outperforms both on-policy methods. We attribute this to two factors: (i) experience replay enables DQN to revisit high-scoring trajectories thousands of times, amplifying the learning signal from rare events such as 512-tile merges; and (ii) the $\varepsilon$-greedy schedule provides structured exploration that gradually transitions from random play to learned strategy. On-policy methods discard each trajectory after a single policy update, making them less sample-efficient in this sparse-reward setting.
+\textbf{DQN dominance.} DQN substantially outperforms all other agents at 1M steps with shaped rewards, reaching 1024 tiles in 10\% of episodes and averaging 6,384 points. We attribute this to two factors: (i) experience replay (100K buffer) enables DQN to revisit high-scoring trajectories thousands of times, amplifying the learning signal from rare events such as 1024-tile merges; and (ii) the $\varepsilon$-greedy schedule provides structured exploration that gradually transitions from random play to learned strategy. On-policy methods discard each trajectory after a single policy update, making them far less sample-efficient in this sparse-reward setting.
 
-\textbf{QR-DQN underperformance.} Despite its richer distributional representation, QR-DQN did not surpass standard DQN at 500K steps. The 50-quantile output head increases the network's output dimensionality from $4$ to $4\times50{=}200$, requiring more samples to accurately fit the distribution. We hypothesize that with a larger training budget (e.g., 2M steps) or prioritized experience replay, QR-DQN would eventually surpass DQN by better capturing the heavy-tailed reward structure.
+\textbf{LFA as second-best.} Surprisingly, the hand-crafted linear function approximation agent achieves second place (avg 2,455, max tile 1024). Its 27-dimensional feature vector encodes domain-specific heuristics (monotonicity, corner bonus, merge potential) that provide a strong inductive bias. While LFA lacks the representational capacity of a CNN, these engineered features bootstrap learning faster than deep networks that must learn spatial patterns from scratch.
 
-Fig.~\ref{fig:dqn_curves} and Fig.~\ref{fig:qrdqn_curves} show the training curves for DQN and QR-DQN respectively.
+\textbf{On-policy plateau.} PPO and A2C remain near the random baseline ($\sim$1,000--1,200 avg score) despite 1M steps. Both algorithms process each trajectory exactly once, creating a chicken-and-egg problem: the agent cannot generate informative training data until it learns a good policy, but it cannot learn a good policy without informative data. The lack of explicit invalid action masking in the SB3 policy heads further wastes probability mass on illegal moves.
+
+\textbf{QR-DQN underperformance.} Despite its richer distributional representation, QR-DQN performs worst among all agents (avg 782). The 100-quantile output head increases the effective output dimensionality from 4 to $4\times100{=}400$, requiring proportionally more training data. Combined with a lower learning rate ($5\times10^{-5}$ vs DQN's $10^{-4}$) and fewer parallel environments (4 vs DQN's vectorized buffer), QR-DQN converges too slowly at the 1M-step budget.
+
+\textbf{SAC's discrete adaptation.} SAC's max-entropy objective, designed for continuous control, does not transfer well to 2048's 4-action space. The automatic temperature tuning and twin Q-networks add overhead that slows convergence. However, SAC achieves the second-highest individual max score (4,814) and reaches 512 tiles, suggesting its off-policy replay provides some advantage over PPO/A2C.
+
+\textbf{Hunt mode.} Table~\ref{tab:hunt_results} shows results from unlimited-attempt hunt mode, where each agent plays with stochastic action selection until reaching tile 2048.
+
+\begin{table}[t]
+\centering
+\caption{Hunt Mode Results (Unlimited Attempts, Stochastic Action Selection)}
+\label{tab:hunt_results}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Agent} & \textbf{Best Tile} & \textbf{Best Score} & \textbf{Strategy} \\
+\midrule
+DQN    & 2048 & 21,572 & $\varepsilon$=0.05 \\
+LFA    & 1024 & 12,300 & 95\% greedy \\
+A2C    & 512  & 7,844  & Distribution sampling \\
+PPO    & 512  & 5,860  & Distribution sampling \\
+SAC    & 256  & 3,648  & Probability sampling \\
+QR-DQN & 16   & 228    & $\varepsilon$=0.05 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+DQN is the only agent to reach 2048. The hunt results reveal that deterministic greedy policies create infinite cycles at high-tile states where Q-values are poorly estimated; adding 5\% random exploration breaks these cycles. LFA's handcrafted features provide enough signal to reach 1024 but lack the representational capacity for the final 1024$\to$2048 merge sequence.
+
+Fig.~\ref{fig:dqn_curves} shows the DQN training curves.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{fig_dqn_curves.png}
-    \caption{DQN training curves over 500K steps. The agent shows steady score improvement with max tile reaching 512 after approximately 200K steps.}
+    \caption{DQN training curves over 1M steps with shaped reward. The agent reaches 1024 tiles after approximately 500K steps, with steady score improvement throughout training.}
     \label{fig:dqn_curves}
-\end{figure}
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth]{fig_qrdqn_curves.png}
-    \caption{QR-DQN training curves over 500K steps. Performance plateaus around 900 average score, with max tile capped at 256 throughout training.}
-    \label{fig:qrdqn_curves}
 \end{figure}
 
 \subsection{LLM-RLVR Results}
 
-The GRPO-trained LLM was evaluated over 20 games after 500 training steps. Table~\ref{tab:llm_results} summarizes the key metrics.
+The GRPO-trained LLM was evaluated via a single-game replay after 300 training steps. Table~\ref{tab:llm_results} summarizes the key metrics.
 
 \begin{table}[t]
 \centering
-\caption{LLM Agent Performance After 500 GRPO Steps}
+\caption{LLM Agent Performance After 300 GRPO Steps}
 \label{tab:llm_results}
 \begin{tabular}{@{}lr@{}}
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Average score       & 196 \\
-Maximum score       & 432 \\
-Maximum tile        & 32 \\
-Format compliance   & 100\% \\
-Direction diversity & 4/4 directions used \\
-Avg moves/game      & 28 \\
+Score               & 1,816 \\
+Maximum tile        & 128 \\
+Moves per game      & 186 \\
+Format compliance   & $\sim$30--44\% \\
+Direction accuracy  & $\sim$12--37\% \\
 Inference speed     & $\sim$1,500 ms/move \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Format learning.} The most striking finding is that the LLM achieved 100\% compliance with the XML output schema (\texttt{<think>...\allowbreak</think>\allowbreak<answer>...\allowbreak</answer>}) by step 500. At step 100, the model had only a $\sim$60\% format compliance rate. This confirms that GRPO can effectively teach structural constraints through verifiable rewards without supervised formatting examples.
+\textbf{Format learning.} The LLM achieved 30--44\% compliance with the XML output schema (\texttt{<think>...\allowbreak</think>\allowbreak<answer>...\allowbreak</answer>}) after 300 steps with format-only reward shaping. Early training (steps 1--30) showed rapid reward improvement from 0.06 to 0.41, but the model suffered from gradient instability (grad norms exceeding 17,000 at step 297) and KL divergence spikes, indicating the 0.5B model struggles to simultaneously learn format and strategy. Training with game rewards included caused catastrophic collapse (the model reward-hacked the length penalty, generating filler text to maximize word count while ignoring format entirely).
 
-\textbf{Direction diversity.} At step 100, the model exhibited a strong bias toward RIGHT and LEFT moves, rarely selecting UP or DOWN. By step 500, all four directions were utilized, indicating that the game reward component successfully penalized the collapse to a two-direction policy.
+\textbf{Training stability challenges.} GRPO training required several iterations to stabilize: (i) the length reward function was removed after the model collapsed to maximizing completion length; (ii) the game reward function was removed because it returns $-1.0$ for unparseable outputs, dominating the total reward before format is learned; (iii) the learning rate was reduced from $5\times10^{-6}$ to $10^{-6}$ and gradient clipping set to 0.5 to prevent divergence.
 
-\textbf{Reasoning evolution.} We observed qualitative improvements in the model's chain-of-thought reasoning. Early-stage outputs contained random directional guesses (``\textit{I'll go RIGHT}''), while later outputs included board-aware justifications (``\textit{The 8 and 8 in R2 can merge if I move LEFT. Moving LEFT will also push the 4 tiles together in R3.}'').
-
-Fig.~\ref{fig:llm_curves} shows the LLM evaluation curves.
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth]{fig_llm_curves.png}
-    \caption{LLM agent evaluation curves showing score progression and tile distribution over evaluation episodes.}
-    \label{fig:llm_curves}
-\end{figure}
+\textbf{Inference performance.} Despite partial format compliance during training, the replay pipeline achieves a functional game by using a fallback parser that extracts direction keywords from raw text when XML parsing fails. This two-stage parsing (XML $\to$ keyword scan $\to$ random valid action) enables the LLM to play complete games, scoring 1,816 with max tile 128 over 186 moves.
 
 \subsection{Comparative Analysis}
 
