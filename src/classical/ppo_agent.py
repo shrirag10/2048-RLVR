@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from stable_baselines3 import PPO
+from sb3_contrib import MaskablePPO as PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
@@ -130,15 +130,15 @@ def train_ppo(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/ppo",
-    reward_mode: str = "log_score",      # log reward → dense gradient at ALL tile levels
+    reward_mode: str = "shaped",          # milestone bonuses at 256/512/1024/2048
     seed: int = 42,
     lr: float = 2e-4,                     # slightly lower for stability
-    n_steps: int = 4096,                  # longer rollouts capture full 2048 episodes
-    batch_size: int = 256,                # larger batch = stabler gradients
-    n_epochs: int = 4,                   # fewer epochs → less overfitting
-    gamma: float = 0.995,                 # higher discount for long-horizon
+    n_steps: int = 512,                   # shorter rollouts → faster policy updates
+    batch_size: int = 128,
+    n_epochs: int = 4,
+    gamma: float = 0.995,
     clip_range: float = 0.2,
-    ent_coef: float = 0.01,               # entropy bonus prevents premature collapse
+    ent_coef: float = 0.05,               # stronger entropy prevents premature collapse
     n_envs: int = 8,
     device: str = "auto",
 ) -> PPO:

@@ -296,29 +296,44 @@ def hunt(agent_id: str, ckpt: str, display: str, log_dir: str):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def _build_agents_list(log_root: str, mode: str = None):
+    """Build AGENTS list with correct checkpoint paths for the given mode."""
+    suffix = f"_{mode}" if mode else ""
+    return [
+        dict(id=a["id"], ckpt=os.path.join(log_root, f"{a['id']}{suffix}", os.path.basename(a["ckpt"])),
+             display=a["display"])
+        for a in AGENTS
+    ]
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--agents", nargs="+", default=[a["id"] for a in AGENTS],
                    choices=[a["id"] for a in AGENTS],
                    help="Agents to run (default: all). lfa only available after training.")
     p.add_argument("--log-root", default="logs", help="Root log directory")
+    p.add_argument("--mode", default=None, choices=["1m", "5m"],
+                   help="Training mode suffix (e.g. --mode 5m → logs/dqn_5m/)")
     args = p.parse_args()
 
-    selected = [a for a in AGENTS if a["id"] in args.agents]
+    suffix = f"_{args.mode}" if args.mode else ""
+    agents_list = _build_agents_list(args.log_root, args.mode)
+    selected = [a for a in agents_list if a["id"] in args.agents]
     print(f"\n  Hunting tile {TARGET} with {len(selected)} agent(s): "
-          f"{', '.join(a['display'] for a in selected)}")
+          f"{', '.join(a['display'] for a in selected)}"
+          f"{f' (mode={args.mode})' if args.mode else ''}")
 
     for agent in selected:
         hunt(
             agent_id=agent["id"],
             ckpt=agent["ckpt"],
             display=agent["display"],
-            log_dir=os.path.join(args.log_root, agent["id"]),
+            log_dir=os.path.join(args.log_root, f"{agent['id']}{suffix}"),
         )
 
-    # ── Update manifest.json — merge hunt_replay into existing entries ────────
-    manifest_path = os.path.join(args.log_root, "manifest.json")
-    # Load existing manifest if present (preserves normal replay entries)
+    # ── Update manifest — merge hunt_replay into existing entries ────────
+    manifest_name = f"manifest_{args.mode}.json" if args.mode else "manifest.json"
+    manifest_path = os.path.join(args.log_root, manifest_name)
     if os.path.exists(manifest_path):
         with open(manifest_path) as f:
             manifest = json.load(f)
@@ -328,23 +343,22 @@ if __name__ == "__main__":
     display_names = {a["id"]: a["display"] for a in AGENTS}
     existing = {a["id"]: a for a in manifest.get("agents", [])}
 
-    for agent in AGENTS:
-        hunt_replay_path = os.path.join(args.log_root, agent["id"], "hunt_replays.json")
+    for agent in agents_list:
+        hunt_replay_path = os.path.join(args.log_root, f"{agent['id']}{suffix}", "hunt_replays.json")
         if not os.path.exists(hunt_replay_path):
             continue
         with open(hunt_replay_path) as f:
             hunt_summary = json.load(f).get("summary", {})
 
-        if agent["id"] in existing:
-            # Patch hunt_replay into the existing entry — don't overwrite replay
-            existing[agent["id"]]["hunt_replay"]         = hunt_replay_path
-            existing[agent["id"]]["hunt_replay_summary"] = hunt_summary
+        aid = agent["id"]
+        if aid in existing:
+            existing[aid]["hunt_replay"]         = hunt_replay_path
+            existing[aid]["hunt_replay_summary"] = hunt_summary
         else:
-            # Agent has no normal replay yet — add a minimal entry
-            existing[agent["id"]] = {
-                "id":                 agent["id"],
-                "name":               display_names[agent["id"]],
-                "checkpoint":         os.path.abspath(agent["ckpt"]),
+            existing[aid] = {
+                "id":                  aid,
+                "name":                display_names[aid],
+                "checkpoint":          os.path.abspath(agent["ckpt"]),
                 "hunt_replay":         hunt_replay_path,
                 "hunt_replay_summary": hunt_summary,
             }
@@ -353,5 +367,5 @@ if __name__ == "__main__":
     manifest["generated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    print(f"  manifest.json updated → {len(manifest['agents'])} agent(s)")
+    print(f"  {manifest_name} updated → {len(manifest['agents'])} agent(s)")
     print("  All done.")

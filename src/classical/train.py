@@ -172,6 +172,10 @@ def main():
         "--num-envs", type=int, default=None,
         help="Number of parallel envs (default: 8 for on-policy, 4 for off-policy)"
     )
+    train_p.add_argument(
+        "--mode", default=None, choices=["1m", "5m"],
+        help="Training mode — appends suffix to log dir (e.g. logs/dqn_5m/)"
+    )
 
     # Eval command
     eval_p = sub.add_parser("eval", help="Evaluate a trained agent")
@@ -198,7 +202,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "train":
-        log_dir = os.path.join(args.log_dir, args.agent)
+        suffix = f"_{args.mode}" if getattr(args, 'mode', None) else ""
+        log_dir = os.path.join(args.log_dir, f"{args.agent}{suffix}")
         if args.agent == "dqn":
             from src.classical.dqn_agent import train_dqn
             kwargs = {}

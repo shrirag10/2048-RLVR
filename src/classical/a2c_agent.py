@@ -127,12 +127,12 @@ def train_a2c(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/a2c",
-    reward_mode: str = "log_score",      # dense gradient at all tile levels
+    reward_mode: str = "shaped",          # milestone bonuses at 256/512/1024/2048
     seed: int = 42,
-    lr: float = 3e-4,                    # lower LR for stability
-    n_steps: int = 128,                  # n-step returns: 128 >> 5 for long episodes
-    gamma: float = 0.995,                # long-horizon discount
-    ent_coef: float = 0.05,              # higher entropy: A2C needs more exploration than PPO
+    lr: float = 3e-4,
+    n_steps: int = 512,                  # longer n-step returns for long 2048 episodes
+    gamma: float = 0.995,
+    ent_coef: float = 0.1,               # stronger entropy prevents A2C policy collapse
     vf_coef: float = 0.25,
     max_grad_norm: float = 0.5,
     n_envs: int = 8,

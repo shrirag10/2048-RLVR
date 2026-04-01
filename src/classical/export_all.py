@@ -77,15 +77,16 @@ def _run_one_agent(agent_id: str, ckpt_path: str, replay_path: str,
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def scan_and_export(log_root: str = "logs", timeout: int = 180) -> str:
+def scan_and_export(log_root: str = "logs", timeout: int = 180, mode: str = None) -> str:
     os.makedirs(log_root, exist_ok=True)
+    suffix = f"_{mode}" if mode else ""
 
     # ── Determine which agents need replay generation ────────────────────────
     to_generate: list[tuple] = []   # (agent_id, ckpt_path, replay_path, target_tile)
     already_done: list[str]  = []
 
     for agent_id, (ckpt_file, _) in AGENT_CKPTS.items():
-        agent_dir   = os.path.join(log_root, agent_id)
+        agent_dir   = os.path.join(log_root, f"{agent_id}{suffix}")
         ckpt_path   = os.path.join(agent_dir, ckpt_file)
         replay_path = os.path.join(agent_dir, "replays.json")
 
@@ -117,8 +118,9 @@ def scan_and_export(log_root: str = "logs", timeout: int = 180) -> str:
     # ── Build manifest from all agents that now have a replay ────────────────
     manifest: dict = {"agents": [], "generated": time.strftime("%Y-%m-%dT%H:%M:%S")}
 
+    mode_label = f" ({mode.upper()})" if mode else ""
     for agent_id, (ckpt_file, display_name) in AGENT_CKPTS.items():
-        agent_dir   = os.path.join(log_root, agent_id)
+        agent_dir   = os.path.join(log_root, f"{agent_id}{suffix}")
         ckpt_path   = os.path.join(agent_dir, ckpt_file)
         replay_path = os.path.join(agent_dir, "replays.json")
 
@@ -133,10 +135,11 @@ def scan_and_export(log_root: str = "logs", timeout: int = 180) -> str:
             pass
 
         training = _csv_summary(os.path.join(agent_dir, f"{agent_id}_metrics.csv"))
+        manifest_id = f"{agent_id}_{mode}" if mode else agent_id
 
         manifest["agents"].append({
-            "id":             agent_id,
-            "name":           display_name,
+            "id":             manifest_id,
+            "name":           f"{display_name}{mode_label}",
             "checkpoint":     ckpt_path,
             "replay":         replay_path,
             "replay_summary": replay_summary,
@@ -146,7 +149,8 @@ def scan_and_export(log_root: str = "logs", timeout: int = 180) -> str:
               f"avg={training.get('avg_score','?')}  "
               f"top={training.get('max_tile_ever','?')}")
 
-    manifest_path = os.path.join(log_root, "manifest.json")
+    manifest_name = f"manifest_{mode}.json" if mode else "manifest.json"
+    manifest_path = os.path.join(log_root, manifest_name)
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
 
@@ -159,13 +163,16 @@ if __name__ == "__main__":
     p.add_argument("--log-dir", default="logs")
     p.add_argument("--timeout", type=int, default=180, help="Seconds per agent (wall clock)")
     p.add_argument("--force",   action="store_true",   help="Delete & regenerate all replays")
+    p.add_argument("--mode", default=None, choices=["1m", "5m"],
+                   help="Training mode suffix (e.g. --mode 5m → logs/dqn_5m/)")
     args = p.parse_args()
 
+    suffix = f"_{args.mode}" if args.mode else ""
     if args.force:
         for aid in AGENT_CKPTS:
-            rp = os.path.join(args.log_dir, aid, "replays.json")
+            rp = os.path.join(args.log_dir, f"{aid}{suffix}", "replays.json")
             if os.path.exists(rp):
                 os.remove(rp)
                 print(f"  [{aid:6}] removed old replay")
 
-    scan_and_export(args.log_dir, args.timeout)
+    scan_and_export(args.log_dir, args.timeout, mode=args.mode)

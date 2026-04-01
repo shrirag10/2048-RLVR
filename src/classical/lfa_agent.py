@@ -63,7 +63,11 @@ _D_MONO    =  4   # monotonicity in 4 directions
 _D_MAXTILE =  1   # log-normalized max tile
 _D_CORNER  =  1   # max-tile-in-corner indicator
 _D_DIST    =  3   # tile distribution (low / mid / high)
-N_FEATURES = _D_TILE + _D_EMPTY + _D_MERGE + _D_MONO + _D_MAXTILE + _D_CORNER + _D_DIST  # 27
+_D_SMOOTH  =  1   # board smoothness (adjacent tile similarity)
+_D_SNAKE   =  1   # snake pattern score (optimal tile arrangement)
+_D_EDGE    =  1   # edge tile sum (keeping big tiles on edges)
+N_FEATURES = (_D_TILE + _D_EMPTY + _D_MERGE + _D_MONO + _D_MAXTILE
+              + _D_CORNER + _D_DIST + _D_SMOOTH + _D_SNAKE + _D_EDGE)  # 30
 
 
 def _board_from_obs(obs: np.ndarray) -> np.ndarray:
@@ -148,6 +152,36 @@ def phi(obs: np.ndarray) -> np.ndarray:
     high = np.sum(board >= 256) / n
     dist_feat = np.array([low, mid, high], dtype=np.float32)
 
+    # 8. Smoothness — negative sum of absolute differences between adjacent log-tiles
+    #    Lower absolute difference = smoother board = easier to merge
+    smoothness = 0.0
+    log_board = np.log2(b2d.astype(np.float32) + 1.0)
+    for r in range(4):
+        for c in range(3):
+            smoothness -= abs(log_board[r, c] - log_board[r, c+1])
+        for c in range(4):
+            if r < 3:
+                smoothness -= abs(log_board[r, c] - log_board[r+1, c])
+    smooth_feat = np.array([smoothness / 60.0 + 1.0], dtype=np.float32)  # normalize ~[0,1]
+
+    # 9. Snake pattern — measures how well tiles follow a snake/zigzag order
+    #    Optimal 2048 strategy arranges tiles in a snake from corner
+    snake_weights = np.array([
+        [15, 14, 13, 12],
+        [ 8,  9, 10, 11],
+        [ 7,  6,  5,  4],
+        [ 0,  1,  2,  3],
+    ], dtype=np.float32)
+    snake_score = np.sum(log_board * snake_weights)
+    max_possible = 15.0 * np.sum(snake_weights)
+    snake_feat = np.array([snake_score / max_possible], dtype=np.float32)
+
+    # 10. Edge tile sum — fraction of total tile value on edges
+    edge_mask = np.zeros((4, 4), dtype=bool)
+    edge_mask[0, :] = edge_mask[3, :] = edge_mask[:, 0] = edge_mask[:, 3] = True
+    total_val = b2d.sum() + 1e-9
+    edge_feat = np.array([b2d[edge_mask].sum() / total_val], dtype=np.float32)
+
     return np.concatenate([
         tile_feats,    # 16
         empty_feat,    #  1
@@ -156,7 +190,10 @@ def phi(obs: np.ndarray) -> np.ndarray:
         maxtile_feat,  #  1
         corner_feat,   #  1
         dist_feat,     #  3
-    ])  # total: 27
+        smooth_feat,   #  1
+        snake_feat,    #  1
+        edge_feat,     #  1
+    ])  # total: 30
 
 
 # ─── Agent ────────────────────────────────────────────────────────────────────
@@ -164,11 +201,11 @@ def phi(obs: np.ndarray) -> np.ndarray:
 @dataclass
 class LFAConfig:
     """Hyperparameters for the Linear FA SARSA agent."""
-    alpha:       float = 5e-4   # Step size (Sutton & Barto α)
+    alpha:       float = 1e-3   # Step size (Sutton & Barto α) — faster convergence
     gamma:       float = 0.99   # Discount factor (γ)
     epsilon:     float = 1.0    # Initial ε for ε-greedy policy
     epsilon_min: float = 0.05   # Final ε
-    epsilon_decay: float = 0.9999  # Multiplicative decay applied each step
+    epsilon_decay: float = 0.99995  # Slower decay for longer exploration horizon
 
 
 class LinearFAAgent:
@@ -317,7 +354,7 @@ def train_lfa(
     epsilon:         float = 1.0,
     epsilon_min:     float = 0.05,
     epsilon_decay:   float = 0.9999,
-    reward_mode:     str   = "score_delta",
+    reward_mode:     str   = "shaped",
     seed:            int   = 42,
     log_dir:         str   = "logs/lfa",
     checkpoint_freq: int   = 100_000,

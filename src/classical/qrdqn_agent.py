@@ -128,19 +128,19 @@ def train_qrdqn(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/qrdqn",
-    reward_mode: str = "log_score",           # dense signal at all tile levels
+    reward_mode: str = "shaped",               # milestone bonuses at 256/512/1024/2048
     seed: int = 42,
-    lr: float = 5e-5,                          # lower LR stabilises distributional loss
-    buffer_size: int = 300_000,                # 3x bigger: diverse replay
-    batch_size: int = 128,                     # larger batch for quantile regression
-    gamma: float = 0.995,                      # long-horizon discount
-    exploration_fraction: float = 0.5,         # explore longer
+    lr: float = 1e-4,                          # match DQN's learning rate
+    buffer_size: int = 300_000,
+    batch_size: int = 64,                      # match DQN batch size
+    gamma: float = 0.995,
+    exploration_fraction: float = 0.2,         # converge earlier (was 0.5)
     exploration_final_eps: float = 0.01,
-    n_quantiles: int = 100,                    # finer return distribution
-    target_update_interval: int = 500,         # sync target more often
-    train_freq: int = 1,                       # update every step
-    learning_starts: int = 10_000,
-    n_envs: int = 4,
+    n_quantiles: int = 50,                     # fewer quantiles = less overhead (was 100)
+    target_update_interval: int = 500,
+    train_freq: int = 1,
+    learning_starts: int = 5_000,              # learn sooner (was 10k)
+    n_envs: int = 8,                           # match PPO/A2C parallelism (was 4)
     device: str = "auto",
 ) -> QRDQN:
     """

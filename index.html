@@ -47,6 +47,20 @@ tailwind.config = {
 .nav-item{transition:all .2s ease;cursor:pointer}
 .nav-item.active{background:#fff0e7;color:#8c4a00;font-weight:700}
 .nav-item:not(.active):hover{background:#e9e8e5}
+/* Dark mode overrides */
+html.dark body{background:#1a1a1a;color:#e0e0e0}
+html.dark .bg-background,html.dark .bg-surface,html.dark .bg-surface-bright{background:#1a1a1a!important}
+html.dark .bg-surface-container-low,html.dark .bg-surface-container-lowest{background:#222!important}
+html.dark .bg-surface-container,html.dark .bg-surface-container-high{background:#2a2a2a!important}
+html.dark .bg-surface-container-highest{background:#333!important}
+html.dark .bg-surface-variant{background:#3a3a3a!important}
+html.dark .text-on-surface,html.dark .text-on-background{color:#e0e0e0!important}
+html.dark .text-on-surface-variant{color:#aaa!important}
+html.dark .glass-panel{background:rgba(26,26,26,0.85)}
+html.dark .nav-item.active{background:#3d2800;color:#fca151}
+html.dark .nav-item:not(.active):hover{background:#333}
+html.dark .sunken-shadow{box-shadow:0 24px 48px -12px rgba(0,0,0,0.3)}
+html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
 .bar-animate{transition:height 0.6s cubic-bezier(.22,.68,0,1.2)}
 .prob-bar{transition:width 0.25s ease}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#deddd9;border-radius:99px}
@@ -82,6 +96,10 @@ tailwind.config = {
         <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Best Score</p>
         <p class="font-headline font-black text-2xl" id="sidebar-best">0</p>
       </div>
+      <button id="dark-mode-btn" onclick="toggleDarkMode()" class="w-full flex items-center gap-3 px-4 py-3 bg-surface-container rounded-xl hover:bg-surface-container-high transition-all text-sm font-semibold text-on-surface-variant">
+        <span id="dark-mode-icon" class="material-symbols-outlined text-[18px]">dark_mode</span>
+        <span id="dark-mode-label">Dark Mode</span>
+      </button>
     </div>
   </aside>
 
@@ -187,7 +205,15 @@ tailwind.config = {
             <h2 class="font-headline font-black text-4xl tracking-tight mb-3">Neural Architecture vs.<br>LLM Strategic Reasoning</h2>
             <p class="text-on-surface-variant max-w-xl">Classical RL agents (DQN, PPO, A2C, QR-DQN, SAC) benchmarked against the RLVR-trained Qwen2.5-0.5B in the 2048 environment.</p>
           </div>
-          <div class="flex gap-3 shrink-0">
+          <div class="flex flex-col items-end gap-3 shrink-0">
+          <!-- Benchmark training mode toggle -->
+          <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+            <button id="bm-train-1m-btn" onclick="setBmTrainingMode('1m')"
+              class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
+            <button id="bm-train-5m-btn" onclick="setBmTrainingMode('5m')"
+              class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
+          </div>
+          <div class="flex gap-3">
             <div class="bg-surface-container p-4 rounded-xl min-w-[120px]">
               <span class="block text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1">Agents</span>
               <span class="bm-agent-count text-3xl font-black font-headline">—</span>
@@ -196,6 +222,7 @@ tailwind.config = {
               <span class="block text-[10px] font-bold text-on-primary-container tracking-widest uppercase mb-1">Top Tile</span>
               <span class="bm-top-tile text-3xl font-black font-headline text-on-primary-container">—</span>
             </div>
+          </div>
           </div>
         </div>
 
@@ -263,6 +290,44 @@ tailwind.config = {
           </div>
         </div>
 
+        <!-- Episode Length Distribution + Win Rate Progression -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-1">Episode Length Distribution</h3>
+            <p class="text-xs text-on-surface-variant mb-5">Number of episodes per length bucket</p>
+            <canvas id="chartEpLength" height="220"></canvas>
+          </div>
+          <div class="bg-surface-container-low rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-1">Tile 512+ Rate Over Training</h3>
+            <p class="text-xs text-on-surface-variant mb-5">Cumulative % of episodes reaching 512+ tile</p>
+            <canvas id="chartWinRate" height="220"></canvas>
+          </div>
+        </div>
+
+        <!-- Action Distribution Summary -->
+        <div class="bg-surface-container-low rounded-3xl p-7 mb-8">
+          <h3 class="font-headline font-bold text-lg mb-1">Action Distribution Summary</h3>
+          <p class="text-xs text-on-surface-variant mb-5">Overall action usage per agent (%)</p>
+          <canvas id="chartActionDist" height="180"></canvas>
+        </div>
+
+        <!-- Scaling Curves: 1M vs 5M -->
+        <div class="bg-surface-container-low rounded-3xl p-7 mb-8">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <h3 class="font-headline font-bold text-lg">Scaling Curves</h3>
+              <p class="text-xs text-on-surface-variant mt-0.5">Agent performance at 50k, 100k, 200k, 500k, 1M, 2M, 5M training steps</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="scale-score-btn" onclick="setScalingMetric('avg_score')" class="px-3 py-1 text-xs font-bold rounded-lg bg-primary text-on-primary">Score</button>
+              <button id="scale-tile-btn" onclick="setScalingMetric('reach_512')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant">512+ Rate</button>
+              <button id="scale-1024-btn" onclick="setScalingMetric('reach_1024')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant">1024+ Rate</button>
+            </div>
+          </div>
+          <canvas id="chartScaling" height="250"></canvas>
+          <p class="text-[10px] text-on-surface-variant mt-3 text-center">Run: <code class="bg-surface-container px-1.5 py-0.5 rounded">python3 -m src.classical.scaling_eval</code> to generate data</p>
+        </div>
+
         <!-- Board topology -->
         <div class="bg-surface-container-lowest rounded-3xl p-10 text-center" style="border:1px solid rgba(174,173,170,0.15)">
           <h3 class="font-headline font-black text-2xl mb-3">Tile Spectrum · Design System</h3>
@@ -293,6 +358,13 @@ tailwind.config = {
                   <option value="80">Fast</option>
                   <option value="20">Turbo</option>
                 </select>
+              </div>
+              <!-- Training mode toggle: 1M vs 5M -->
+              <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1 ml-auto">
+                <button id="train-1m-btn" onclick="setTrainingMode('1m')"
+                  class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
+                <button id="train-5m-btn" onclick="setTrainingMode('5m')"
+                  class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
               </div>
               <!-- Mode toggle: Normal replay vs Hunt-2048 replay -->
               <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1 ml-auto">
@@ -334,11 +406,19 @@ tailwind.config = {
                 <span id="pb-play-label">Play</span>
               </button>
               <button onclick="pbStep()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Step</button>
+              <button onclick="pbStepBack()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Back</button>
               <button onclick="pbNewEpisode()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Restart</button>
               <div class="ml-auto text-right">
                 <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Episode Score</p>
                 <p id="pb-score" class="font-headline font-black text-xl">0</p>
               </div>
+            </div>
+            <!-- Keyboard shortcuts hint -->
+            <div class="mt-3 flex flex-wrap gap-3 text-[10px] text-on-surface-variant font-semibold uppercase tracking-widest">
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">Space</kbd> / <kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">&rarr;</kbd> Step</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">&larr;</kbd> Back</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">P</kbd> Play/Pause</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">R</kbd> Restart</span>
             </div>
           </div>
 
@@ -383,6 +463,16 @@ tailwind.config = {
                 <span class="material-symbols-outlined text-primary text-[18px]">show_chart</span> Score Progression
               </h3>
               <canvas id="chartPbHistory" height="120"></canvas>
+            </div>
+
+            <!-- Action distribution doughnut -->
+            <div class="bg-surface-container-low rounded-2xl p-6">
+              <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">donut_large</span> Action Distribution
+              </h3>
+              <div class="flex items-center justify-center" style="max-height:200px">
+                <canvas id="chartPbActions" height="160"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -632,9 +722,10 @@ async function initBenchmark() {
   });
 
   /* fetch & parse all CSVs in parallel */
+  const modeSuffix = _trainingMode === '5m' ? '_5m' : '';
   const loaded = await Promise.all(AGENT_DEFS.map(async def => {
     try {
-      const r = await fetch(`logs/${def.id}/${def.id}_metrics.csv`);
+      const r = await fetch(`logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`);
       if (!r.ok) return null;
       const rows = _parseCSV(await r.text());
       if (!rows.length) return null;
@@ -949,6 +1040,7 @@ function replayStep() {
 ═════════════════════════════════════════════════════════ */
 let _manifest = null;
 let _replayMode = 'normal';   // 'normal' | 'hunt'
+let _trainingMode = '1m';     // '1m' | '5m'
 
 // Agent accent colors
 const AGENT_COLORS = {
@@ -971,6 +1063,18 @@ function setReplayMode(mode) {
 
   // Rebuild dropdown showing only agents that have a replay in this mode
   _rebuildDropdown();
+}
+
+function setTrainingMode(mode) {
+  _trainingMode = mode;
+  const is5m = mode === '5m';
+  document.getElementById('train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Reload manifest for the selected training mode
+  bmInited = false;
+  loadManifest();
 }
 
 function _replayUrlFor(agent) {
@@ -1023,12 +1127,13 @@ function _rebuildDropdown() {
 
 async function loadManifest() {
   const sel = document.getElementById('agent-select');
+  const manifestFile = _trainingMode === '5m' ? 'logs/manifest_5m.json' : 'logs/manifest.json';
   try {
-    const res = await fetch('logs/manifest.json');
+    const res = await fetch(manifestFile);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _manifest = await res.json();
   } catch(e) {
-    sel.innerHTML = '<option value="">⚠ Run: python3 -m src.classical.export_all</option>';
+    sel.innerHTML = `<option value="">⚠ No ${_trainingMode.toUpperCase()} data — run export_all --mode ${_trainingMode}</option>`;
     sel.disabled = false;
     return;
   }
@@ -1085,8 +1190,375 @@ function _applyReplayData(data, label) {
   logEl.appendChild(line);
 }
 
+/* ═════════════════════════════════════════════════════════
+   PLAYBACK KEYBOARD SHORTCUTS
+═════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (document.getElementById('view-playback').classList.contains('hidden')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); pbStep(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pbStepBack(); }
+  else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); pbToggle(); }
+  else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); pbNewEpisode(); }
+});
+
+/* Step backward in playback */
+function pbStepBack() {
+  if (!replayData || replayStepIdx <= 0) return;
+  replayStepIdx = Math.max(0, replayStepIdx - 1);
+  const epIdx = parseInt(document.getElementById('replay-ep-select').value) || 0;
+  const ep = replayData.episodes[epIdx];
+  if (!ep) return;
+  if (replayStepIdx === 0) {
+    loadReplayEpisode(epIdx);
+    return;
+  }
+  const step = ep.steps[replayStepIdx - 1];
+  const pbBoardEl = document.getElementById('pb-board');
+  if (!pbBoardEl.children.length) createCells(pbBoardEl);
+  renderBoard(pbBoardEl, { board: step.board });
+  ['up','right','down','left'].forEach((n, i) => {
+    const pct = Math.round(step.probs[i] * 100);
+    document.getElementById('prob-' + n).style.width = pct + '%';
+    document.getElementById('pv-' + n).textContent = pct + '%';
+  });
+  document.getElementById('pb-score').textContent = step.total_score.toLocaleString();
+  document.getElementById('pb-moves').textContent = replayStepIdx;
+  document.getElementById('pb-maxtile').textContent = step.max_tile;
+  // Update action distribution on step back
+  _recalcActionDist(ep, replayStepIdx);
+}
+
+/* ═════════════════════════════════════════════════════════
+   PLAYBACK ACTION DISTRIBUTION DOUGHNUT
+═════════════════════════════════════════════════════════ */
+let pbActionsChart = null;
+const pbActionCounts = [0, 0, 0, 0]; // UP, RIGHT, DOWN, LEFT
+
+function _initPbActionsChart() {
+  if (pbActionsChart) return;
+  pbActionsChart = new Chart(document.getElementById('chartPbActions'), {
+    type: 'doughnut',
+    data: {
+      labels: ['UP', 'RIGHT', 'DOWN', 'LEFT'],
+      datasets: [{
+        data: [0, 0, 0, 0],
+        backgroundColor: ['#8c4a00', '#705900', '#ac292e', '#1a6b3a'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10, padding: 12 } }
+      }
+    }
+  });
+}
+
+function _updatePbActionsChart() {
+  if (!pbActionsChart) _initPbActionsChart();
+  pbActionsChart.data.datasets[0].data = [...pbActionCounts];
+  pbActionsChart.update('none');
+}
+
+function _resetPbActionCounts() {
+  pbActionCounts[0] = 0; pbActionCounts[1] = 0; pbActionCounts[2] = 0; pbActionCounts[3] = 0;
+  if (pbActionsChart) {
+    pbActionsChart.data.datasets[0].data = [0, 0, 0, 0];
+    pbActionsChart.update('none');
+  }
+}
+
+function _recalcActionDist(ep, upToStep) {
+  pbActionCounts[0] = 0; pbActionCounts[1] = 0; pbActionCounts[2] = 0; pbActionCounts[3] = 0;
+  for (let i = 0; i < upToStep && i < ep.steps.length; i++) {
+    const a = ep.steps[i].action;
+    if (a >= 0 && a <= 3) pbActionCounts[a]++;
+  }
+  _updatePbActionsChart();
+}
+
+/* Patch pbStep to track action counts */
+const _origReplayStep = replayStep;
+replayStep = function() {
+  const epIdx = parseInt(document.getElementById('replay-ep-select').value) || 0;
+  const ep = replayData?.episodes[epIdx];
+  const prevIdx = replayStepIdx;
+  _origReplayStep();
+  if (ep && replayStepIdx > prevIdx) {
+    const step = ep.steps[prevIdx];
+    if (step && step.action >= 0 && step.action <= 3) {
+      pbActionCounts[step.action]++;
+      _updatePbActionsChart();
+    }
+  }
+};
+
+/* Patch pbNewEpisode to reset action counts */
+const _origPbNewEpisode = pbNewEpisode;
+pbNewEpisode = function() {
+  _resetPbActionCounts();
+  _origPbNewEpisode();
+  if (!pbActionsChart) _initPbActionsChart();
+};
+
+/* ═════════════════════════════════════════════════════════
+   DARK MODE TOGGLE
+═════════════════════════════════════════════════════════ */
+function toggleDarkMode() {
+  const html = document.documentElement;
+  const isDark = html.classList.toggle('dark');
+  localStorage.setItem('rlvr-dark', isDark ? '1' : '0');
+  document.getElementById('dark-mode-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+  document.getElementById('dark-mode-label').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+// Restore dark mode from localStorage
+(function() {
+  if (localStorage.getItem('rlvr-dark') === '1') {
+    document.documentElement.classList.add('dark');
+    document.getElementById('dark-mode-icon').textContent = 'light_mode';
+    document.getElementById('dark-mode-label').textContent = 'Light Mode';
+  }
+})();
+
+/* ═════════════════════════════════════════════════════════
+   BENCHMARK TRAINING MODE TOGGLE
+═════════════════════════════════════════════════════════ */
+function setBmTrainingMode(mode) {
+  _trainingMode = mode;
+  const is5m = mode === '5m';
+  document.getElementById('bm-train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('bm-train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Also sync playback training mode buttons
+  document.getElementById('train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Reset and reload benchmark
+  bmInited = false;
+  // Destroy existing charts so they can be recreated
+  if (chartScore) { chartScore.destroy(); chartScore = null; }
+  if (chartTile) { chartTile.destroy(); chartTile = null; }
+  if (chartEpLength) { chartEpLength.destroy(); chartEpLength = null; }
+  if (chartWinRate) { chartWinRate.destroy(); chartWinRate = null; }
+  if (chartActionDist) { chartActionDist.destroy(); chartActionDist = null; }
+  initBenchmark();
+  // Reload manifest for playback too
+  loadManifest();
+}
+
+/* ═════════════════════════════════════════════════════════
+   BENCHMARK EXTRA CHARTS (Episode Length, Win Rate, Action Dist)
+═════════════════════════════════════════════════════════ */
+let chartEpLength = null, chartWinRate = null, chartActionDist = null;
+
+/* Inject extra benchmark charts — called at end of initBenchmark */
+const _origInitBenchmark = initBenchmark;
+initBenchmark = async function() {
+  await _origInitBenchmark();
+  await _buildExtraBenchmarkCharts();
+};
+
+async function _buildExtraBenchmarkCharts() {
+  const modeSuffix = _trainingMode === '5m' ? '_5m' : '';
+  const allAgentData = await Promise.all(AGENT_DEFS.map(async def => {
+    try {
+      const r = await fetch(`logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`);
+      if (!r.ok) return null;
+      const rows = _parseCSV(await r.text());
+      if (!rows.length) return null;
+      return { ...def, rows };
+    } catch(e) { return null; }
+  }));
+  const agents = allAgentData.filter(Boolean);
+  if (!agents.length) return;
+
+  /* Episode Length Distribution */
+  const bucketLabels = ['0-100', '100-200', '200-500', '500-1000', '1000+'];
+  const bucketRanges = [[0,100],[100,200],[200,500],[500,1000],[1000,Infinity]];
+  if (!chartEpLength) {
+    chartEpLength = new Chart(document.getElementById('chartEpLength'), {
+      type: 'bar',
+      data: {
+        labels: bucketLabels,
+        datasets: agents.map(a => {
+          const lengths = a.rows.map(r => +(r.num_moves || r.episode_length || 0));
+          const counts = bucketRanges.map(([lo, hi]) => lengths.filter(l => l >= lo && l < hi).length);
+          return { label: a.name, data: counts, backgroundColor: a.color, borderRadius: 4 };
+        })
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
+        scales: {
+          x: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+          y: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(0,0,0,0.04)' },
+               title: { display: true, text: 'Episodes', font: { family: 'Inter', size: 9 } } }
+        }
+      }
+    });
+  }
+
+  /* Tile 512+ Rate Over Training */
+  const nPts = 200;
+  if (!chartWinRate) {
+    chartWinRate = new Chart(document.getElementById('chartWinRate'), {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: nPts }, (_, i) => Math.round(i * (agents[0].rows.length / nPts))),
+        datasets: agents.map(a => {
+          const tiles = a.rows.map(r => +r.max_tile);
+          const cumPct = [];
+          let wins = 0;
+          const step = Math.max(1, Math.floor(tiles.length / nPts));
+          for (let i = 0; i < nPts; i++) {
+            const idx = Math.min(Math.floor(i * step) + step, tiles.length);
+            const slice = tiles.slice(0, idx);
+            wins = slice.filter(t => t >= 512).length;
+            cumPct.push(+((wins / Math.max(1, slice.length)) * 100).toFixed(2));
+          }
+          return {
+            label: a.name, data: cumPct, borderColor: a.color, backgroundColor: a.color + '18',
+            fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2,
+          };
+        })
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 6, font: { family: 'Inter', size: 10 } }, grid: { display: false },
+               title: { display: true, text: 'Episode', font: { family: 'Inter', size: 9 } } },
+          y: { ticks: { font: { family: 'Inter', size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' },
+               title: { display: true, text: 'Cumulative %', font: { family: 'Inter', size: 9 } } }
+        }
+      }
+    });
+  }
+
+  /* Action Distribution Summary (horizontal stacked bar) */
+  const actionLabels = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
+  const actionColors = ['#8c4a00', '#705900', '#ac292e', '#1a6b3a'];
+  if (!chartActionDist) {
+    const actionDatasets = actionLabels.map((lbl, ai) => ({
+      label: lbl,
+      data: agents.map(a => {
+        const total = a.rows.length;
+        if (!total) return 0;
+        // Count actions from CSV if action column exists, else estimate from replay data
+        const actions = a.rows.map(r => +r.action).filter(v => !isNaN(v));
+        if (actions.length) {
+          const count = actions.filter(act => act === ai).length;
+          return +((count / actions.length) * 100).toFixed(1);
+        }
+        return 25; // fallback uniform
+      }),
+      backgroundColor: actionColors[ai],
+    }));
+    chartActionDist = new Chart(document.getElementById('chartActionDist'), {
+      type: 'bar',
+      data: { labels: agents.map(a => a.name), datasets: actionDatasets },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
+        scales: {
+          x: { stacked: true, max: 100, ticks: { font: { family: 'Inter', size: 10 }, callback: v => v + '%' },
+               grid: { color: 'rgba(0,0,0,0.04)' } },
+          y: { stacked: true, ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   SCALING CURVES — loads logs/scaling_curves.json
+═════════════════════════════════════════════════════════ */
+let chartScaling = null;
+let _scalingData = null;
+let _scalingMetric = 'avg_score';
+
+function setScalingMetric(metric) {
+  _scalingMetric = metric;
+  ['avg_score', 'reach_512', 'reach_1024'].forEach(m => {
+    const btn = document.getElementById(m === 'avg_score' ? 'scale-score-btn' : m === 'reach_512' ? 'scale-tile-btn' : 'scale-1024-btn');
+    btn.className = `px-3 py-1 text-xs font-bold rounded-lg transition-all ${m === metric ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  });
+  renderScalingChart();
+}
+
+async function loadScalingData() {
+  try {
+    const r = await fetch('logs/scaling_curves.json');
+    if (!r.ok) return;
+    _scalingData = await r.json();
+    renderScalingChart();
+  } catch(e) { /* no scaling data yet */ }
+}
+
+function renderScalingChart() {
+  if (!_scalingData) return;
+  const canvas = document.getElementById('chartScaling');
+  if (!canvas) return;
+
+  if (chartScaling) { chartScaling.destroy(); chartScaling = null; }
+
+  const allColors = {...AGENT_COLORS};
+  const datasets = [];
+  const allSteps = new Set();
+
+  for (const [agentId, points] of Object.entries(_scalingData)) {
+    if (!points.length) continue;
+    points.forEach(p => allSteps.add(p.step));
+    datasets.push({
+      label: agentId.toUpperCase(),
+      data: points.map(p => ({ x: p.step, y: _scalingMetric.startsWith('reach_') ? p[_scalingMetric] * 100 : p[_scalingMetric] })),
+      borderColor: allColors[agentId] || '#777',
+      backgroundColor: (allColors[agentId] || '#777') + '18',
+      fill: false,
+      tension: 0.3,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      borderWidth: 2.5,
+    });
+  }
+
+  const yLabel = _scalingMetric === 'avg_score' ? 'Avg Score' :
+                 _scalingMetric === 'reach_512' ? '512+ Rate (%)' : '1024+ Rate (%)';
+
+  chartScaling = new Chart(canvas, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 12, padding: 8 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${_scalingMetric.startsWith('reach_') ? ctx.parsed.y.toFixed(1) + '%' : Math.round(ctx.parsed.y).toLocaleString()}` } }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Training Steps', font: { family: 'Inter', size: 10 } },
+          ticks: { font: { family: 'Inter', size: 9 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3)+'k' : v },
+          grid: { display: false }
+        },
+        y: {
+          title: { display: true, text: yLabel, font: { family: 'Inter', size: 10 } },
+          ticks: { font: { family: 'Inter', size: 9 }, callback: v => _scalingMetric.startsWith('reach_') ? v + '%' : v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
 newGame();
 initBenchmark(); // preload legend
+loadScalingData(); // load scaling curves if available
 </script>
 </body>
 </html>

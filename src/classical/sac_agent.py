@@ -150,7 +150,7 @@ class DiscreteSACAgent:
         lr: float = 3e-4,
         gamma: float = 0.99,
         tau: float = 0.005,
-        buffer_size: int = 100_000,
+        buffer_size: int = 50_000,
         batch_size: int = 64,
         learning_starts: int = 5000,
         target_entropy_ratio: float = 0.5,
@@ -380,14 +380,14 @@ def train_sac(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/sac",
-    reward_mode: str = "log_score",          # dense gradient at all tile levels
+    reward_mode: str = "shaped",              # milestone bonuses at 256/512/1024/2048
     seed: int = 42,
-    lr: float = 2e-4,                         # lower LR for stability
-    gamma: float = 0.995,                     # long-horizon discount
+    lr: float = 2e-4,
+    gamma: float = 0.995,
     tau: float = 0.005,
-    buffer_size: int = 300_000,               # 3x bigger: richer replay diversity
-    batch_size: int = 128,                    # larger batch for twin critics
-    learning_starts: int = 10_000,            # wait for diverse buffer before learning
+    buffer_size: int = 50_000,                # 300k OOMs (~6GB RAM for obs pairs); 50k ≈ 1GB
+    batch_size: int = 64,
+    learning_starts: int = 1_000,
     n_envs: int = 1,
     device: str = "auto",
 ) -> DiscreteSACAgent:

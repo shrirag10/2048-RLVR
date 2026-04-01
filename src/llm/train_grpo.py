@@ -25,6 +25,8 @@ from src.llm.reward import (
     format_reward_fn,
     direction_reward_fn,
     game_reward_fn,
+    thinking_quality_reward_fn,
+    length_reward_fn,
 )
 
 
@@ -102,6 +104,7 @@ def train_grpo(
     seed: int = 42,
     config_path: Optional[str] = None,
     steps: Optional[int] = None,
+    stage: int = 1,
 ):
     """
     Train the LLM agent using GRPO.
@@ -252,9 +255,23 @@ def train_grpo(
         temperature=0.9,
         beta=0.04,
         max_grad_norm=0.5,        # clip exploding gradients
-        # Format first, direction second — game reward removed until format is learned
-        reward_weights=[0.6, 0.4],
+        reward_weights={
+            1: [0.6, 0.4],              # stage 1: format + direction only
+            2: [0.4, 0.3, 0.3],         # stage 2: + game reward
+            3: [0.3, 0.2, 0.3, 0.1, 0.1],  # stage 3: all rewards
+        }[stage],
     )
+
+    # Build reward function list based on training stage
+    game_reward_adapted = make_game_reward_adapter(dataset)
+    reward_funcs_by_stage = {
+        1: [format_reward_fn, direction_reward_fn],
+        2: [format_reward_fn, direction_reward_fn, game_reward_adapted],
+        3: [format_reward_fn, direction_reward_fn, game_reward_adapted,
+            thinking_quality_reward_fn, length_reward_fn],
+    }
+
+    print(f"  Stage {stage} rewards: {[f.__name__ if hasattr(f, '__name__') else 'game_reward' for f in reward_funcs_by_stage[stage]]}")
 
     # NOTE: Do NOT pass a separate GenerationConfig — it conflicts with Unsloth's
     # GRPO compiled kernel and causes completion_mask size mismatches at runtime.
@@ -264,10 +281,7 @@ def train_grpo(
         args=training_args,
         tokenizer=tokenizer,
         train_dataset=dataset,
-        reward_funcs=[
-            format_reward_fn,
-            direction_reward_fn,
-        ],
+        reward_funcs=reward_funcs_by_stage[stage],
     )
 
     # ── Monkey-patch: fix Unsloth 2026.2.1 completion_mask / completion_ids
@@ -398,6 +412,8 @@ def main():
     parser.add_argument("--output-dir", default="logs/grpo")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--config", default=None, help="YAML config file")
+    parser.add_argument("--stage", type=int, default=1, choices=[1, 2, 3],
+                        help="Training stage: 1=format+direction, 2=+game reward, 3=all rewards")
 
     args = parser.parse_args()
 
@@ -416,6 +432,7 @@ def main():
         seed=args.seed,
         config_path=args.config,
         steps=args.steps,
+        stage=args.stage,
     )
 
 

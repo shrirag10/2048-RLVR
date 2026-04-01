@@ -38,11 +38,11 @@ Boston, USA}
 
 %%====================================================================
 \begin{abstract}
-The puzzle game 2048 offers a compelling reinforcement learning benchmark that combines stochastic dynamics, a combinatorial state space, and delayed, sparse rewards. In this work we conduct a systematic comparison of five classical RL agents---Deep Q-Network (DQN), Proximal Policy Optimization (PPO), Advantage Actor-Critic (A2C), Quantile Regression DQN (QR-DQN), and a discrete variant of Soft Actor-Critic (SAC)---against a 0.5-billion-parameter language model fine-tuned with Group Relative Policy Optimization (GRPO), a form of Reinforcement Learning with Verifiable Rewards (RLVR). Every classical agent is built on an identical three-layer convolutional feature extractor so that performance differences reflect the learning algorithm rather than architectural choices. Our results show that the off-policy DQN agent attains the highest average score of 3,401 and reaches the 512 tile in 21\% of evaluation episodes, while the on-policy PPO and the distributional QR-DQN converge to approximately 1,000 on the same training budget. The GRPO-trained LLM, despite scoring only 196 on average, learns correct XML output formatting and all four directional moves within 500 gradient steps, highlighting RLVR's ability to simultaneously shape both format and strategy. We release a live terminal visualization framework and the complete codebase for reproducibility.
+The puzzle game 2048 offers a compelling reinforcement learning benchmark that combines stochastic dynamics, a combinatorial state space, and delayed, sparse rewards. In this work we conduct a systematic comparison of six classical RL agents---Deep Q-Network (DQN), Proximal Policy Optimization (PPO), Advantage Actor-Critic (A2C), Quantile Regression DQN (QR-DQN), a discrete variant of Soft Actor-Critic (SAC), and Linear Function Approximation (LFA)---against a 0.5-billion-parameter language model fine-tuned with Group Relative Policy Optimization (GRPO), a form of Reinforcement Learning with Verifiable Rewards (RLVR). Every deep classical agent is built on an identical three-layer convolutional feature extractor so that performance differences reflect the learning algorithm rather than architectural choices. Our results show that the off-policy DQN agent attains the highest average score of 6,384 and reaches the 1024 tile in 10\% of episodes (and 2048 in unlimited-attempt hunt mode), while on-policy methods (PPO, A2C) plateau near the random baseline at 1M steps. Surprisingly, LFA with only 108 parameters outperforms all deep on-policy methods, demonstrating the power of domain-specific feature engineering. The GRPO-trained LLM scores 1,816 with max tile 128 after 300 training steps, revealing that RLVR reward functions must be carefully staged to avoid reward hacking and gradient collapse. We release a live web-based visualization dashboard and the complete codebase for reproducibility.
 \end{abstract}
 
 \begin{IEEEkeywords}
-reinforcement learning, deep Q-network, proximal policy optimization, quantile regression, soft actor-critic, GRPO, RLVR, language models, 2048
+reinforcement learning, deep Q-network, proximal policy optimization, quantile regression, soft actor-critic, linear function approximation, GRPO, RLVR, language models, 2048
 \end{IEEEkeywords}
 
 %%====================================================================
@@ -58,10 +58,11 @@ Classical approaches to 2048 span tabular n-tuple networks with temporal-differe
 This paper asks three questions: \textbf{(Q1)} How do five modern RL algorithms compare on 2048 when architectural confounds are removed? \textbf{(Q2)} Can a small (0.5B-parameter) LLM acquire 2048 strategy through GRPO alone? \textbf{(Q3)} What trade-offs arise between classical RL's raw throughput and the LLM approach's interpretability? We make the following contributions:
 
 \begin{enumerate}
-    \item A controlled benchmark of DQN, PPO, A2C, QR-DQN, and discrete SAC on a unified 2048 environment with a shared CNN backbone.
-    \item A novel GRPO training pipeline for an LLM 2048 agent with a five-component verifiable reward function.
-    \item An end-to-end inference pipeline for the LLM agent, including tokenization, constrained generation, and XML-based action parsing.
-    \item A live terminal visualization framework built with \texttt{rich} that supports real-time evaluation of any agent.
+    \item A controlled benchmark of DQN, PPO, A2C, QR-DQN, SAC, and LFA on a unified 2048 environment with a shared CNN backbone and shaped reward function.
+    \item A semi-gradient SARSA agent with 27-dimensional hand-crafted features that outperforms all deep on-policy methods with only 108 parameters.
+    \item A GRPO training pipeline for an LLM 2048 agent with analysis of reward hacking failure modes and staged reward scheduling.
+    \item An ``unlimited-attempt hunt mode'' revealing that deterministic policy cycles require stochastic exploration to reach 2048.
+    \item A live web-based dashboard for step-by-step replay visualization and cross-agent benchmarking.
 \end{enumerate}
 
 %%====================================================================
@@ -331,11 +332,12 @@ Table~\ref{tab:runtime} summarizes the per-move inference cost across all agents
 \toprule
 \textbf{Agent} & \textbf{ms/move} & \textbf{Hardware} & \textbf{Parameters} \\
 \midrule
-DQN        & 3.6    & CPU & 330K \\
-PPO        & $<$1   & CPU & 330K \\
-A2C        & $<$1   & CPU & 330K \\
-QR-DQN     & 4.2    & CPU & 430K \\
-SAC        & $<$1   & CPU & 330K \\
+DQN        & 3.6    & GPU & 330K \\
+PPO        & $<$1   & GPU & 330K \\
+A2C        & $<$1   & GPU & 330K \\
+QR-DQN     & 4.2    & GPU & 430K \\
+SAC        & $<$1   & GPU & 330K \\
+LFA        & $<$0.1 & CPU & 108 \\
 LLM (GRPO) & 1,500  & GPU & 494M \\
 \bottomrule
 \end{tabular}
@@ -444,26 +446,27 @@ Inference speed     & $\sim$1,500 ms/move \\
 
 \begin{table}[t]
 \centering
-\caption{Cross-Method Comparison}
+\caption{Cross-Method Comparison (1M Steps, Shaped Reward)}
 \label{tab:comparison}
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lcccccccc@{}}
 \toprule
-& \textbf{DQN} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{LLM} & \textbf{Rand.}\\
+& \textbf{DQN} & \textbf{LFA} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{SAC} & \textbf{LLM} \\
 \midrule
-Avg Score        & 3,401 & 1,090 & 1,190 & 933 & 196 & $\sim$1,100 \\
-Max Tile         & 512   & 256   & 256   & 256 & 32  & 128 \\
-Interpretable    & No    & No    & No    & No  & Yes & N/A \\
-ms/move          & 3.6   & $<$1  & $<$1  & 4.2 & 1,500 & ${<}$0.1 \\
-Train Steps      & 500K  & 1M    & 500K  & 500K & 500 & 0 \\
-Parameters       & 330K  & 330K  & 330K  & 430K & 494M & 0 \\
-Learning Type    & Off   & On    & On    & Off & GRPO & --- \\
+Avg Score   & 6,384 & 2,455 & 1,038 & 1,205 & 782 & 1,132 & 1,816 \\
+Max Tile    & 1024  & 1024  & 256   & 256   & 256 & 512   & 128 \\
+Hunt Tile   & 2048  & 1024  & 512   & 512   & 16  & 256   & --- \\
+ms/move     & 3.6   & $<$1  & $<$1  & $<$1  & 4.2 & $<$1  & 1,500 \\
+Parameters  & 330K  & 108   & 330K  & 330K  & 430K& 330K  & 494M \\
+Learning    & Off   & On    & On    & On    & Off & Off   & GRPO \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The gap between the best classical agent (DQN, 3,401) and the LLM (196) spans more than an order of magnitude. However, this comparison should be contextualized: the LLM processed only 500$\times$8$=$4,000 effective game states during training, while DQN processed 500K transitions with replay. Moreover, the LLM must simultaneously learn (i) XML output syntax, (ii) spatial board parsing from text, and (iii) game strategy---three tasks that the classical agents never face because their observation encoding and output format are hardcoded.
+The gap between the best classical agent (DQN, 6,384) and the LLM (1,816) is roughly $3.5\times$. However, this comparison should be contextualized: the LLM processed only 300$\times$4$=$1,200 effective game states during training with format-only rewards, while DQN processed 1M transitions with replay and shaped milestone bonuses. Moreover, the LLM must simultaneously learn (i) XML output syntax, (ii) spatial board parsing from text, and (iii) game strategy---three tasks that the classical agents never face because their observation encoding and output format are hardcoded.
 
-A surprising finding is that PPO and the random baseline achieve similar average scores ($\sim$1,000--1,100). This suggests that 1M training steps is insufficient for PPO to substantially outperform random play in this environment, likely due to the on-policy sample inefficiency and the high variance of 2048 returns.
+A striking finding is that LFA, with only 108 trainable parameters (a $4\times27$ weight matrix), outperforms PPO (330K parameters), A2C (330K), QR-DQN (430K), and SAC (330K). This demonstrates that domain-specific feature engineering provides a stronger inductive bias than deep networks that must learn spatial patterns tabula rasa.
+
+PPO and A2C remain near the random baseline ($\sim$1,000--1,200) despite 1M steps with shaped rewards, confirming that on-policy methods are fundamentally sample-inefficient for 2048's sparse, long-horizon reward structure.
 
 %%====================================================================
 \section{Discussion}
@@ -471,15 +474,23 @@ A surprising finding is that PPO and the random baseline achieve similar average
 
 \subsection{Off-Policy Advantage in Sparse-Reward Games}
 
-Our results provide strong evidence that off-policy learning (DQN) significantly outperforms on-policy methods (PPO, A2C) in environments characterized by sparse, high-variance rewards. The experience replay mechanism acts as a natural curriculum: as the agent improves, its replay buffer accumulates an increasingly rich distribution of high-scoring trajectories that inform future updates. In contrast, PPO and A2C process each trajectory exactly once and must rely on the current policy to generate informative training data---a chicken-and-egg problem in the early stages of learning.
+Our results provide strong evidence that off-policy learning (DQN) significantly outperforms on-policy methods (PPO, A2C) in environments characterized by sparse, high-variance rewards. The experience replay mechanism acts as a natural curriculum: as the agent improves, its replay buffer (100K capacity) accumulates an increasingly rich distribution of high-scoring trajectories that inform future updates. In contrast, PPO and A2C process each trajectory exactly once and must rely on the current policy to generate informative training data---a chicken-and-egg problem in the early stages of learning. Notably, even with shaped rewards providing milestone bonuses at 256, 512, and 1024 tiles, on-policy methods fail to break past 256 at 1M steps.
+
+\subsection{Feature Engineering vs. Deep Learning}
+
+LFA's performance as the second-best agent (avg 2,455, max tile 1024) with only 108 parameters challenges the assumption that deep networks are always superior. The hand-crafted 27-dimensional feature vector encodes monotonicity, corner strategies, and merge potential---heuristics that human experts use when playing 2048. These features provide a strong inductive bias that the CNN must learn from scratch. However, LFA's representational ceiling limits it below DQN: the fixed features cannot capture the complex tile interactions needed for the 1024$\to$2048 transition, as evidenced by its failure to reach 2048 in hunt mode.
 
 \subsection{Distributional RL: Promise and Challenges}
 
-QR-DQN's performance comparable to (rather than exceeding) standard DQN contradicts the intuition that distributional methods should excel in stochastic environments. We identify three possible explanations: (1) the 50-quantile representation increases the effective output dimensionality by 12.5$\times$, requiring proportionally more training data; (2) the unimodal reward structure at low tile values (most merges produce similar-magnitude rewards) reduces the information advantage of a distributional model; and (3) at 500K steps, the agent has not yet encountered enough high-tile states to benefit from risk-sensitive decision making.
+QR-DQN's performance as the worst agent (avg 782, max tile 256) contradicts the intuition that distributional methods should excel in stochastic environments. We identify three factors: (1) the 100-quantile representation increases the effective output dimensionality from 4 to 400, requiring proportionally more training data; (2) the lower learning rate ($5\times10^{-5}$) and fewer parallel environments (4 vs 8) slow convergence; and (3) the SB3-Contrib implementation may not support explicit invalid action masking, wasting exploration on illegal moves. We hypothesize that with 5M+ steps and explicit action masking, QR-DQN would eventually leverage its distributional representation.
 
-\subsection{LLM as a Spatial Reasoner}
+\subsection{Hunt Mode and Deterministic Policy Failures}
 
-The GRPO-trained LLM demonstrates that verifiable rewards can teach both format and strategy simultaneously. However, the model's primary bottleneck is \emph{spatial reasoning from text}: it must mentally simulate the effect of sliding tiles in a direction, a task that requires multi-step symbolic manipulation of a 2D array encoded as a flat token sequence. This is fundamentally harder than the vectorized matrix operations that the CNN performs in a single forward pass. We conjecture that incorporating a visual token encoder or a structured board representation could substantially improve the LLM's performance.
+Hunt mode reveals a critical insight: deterministic greedy policies create infinite cycles at board states where Q-values are poorly estimated. After reaching 1024 (a state rarely seen during 1M-step training), DQN's argmax policy repeats the same suboptimal move indefinitely. Adding just 5\% random exploration ($\varepsilon{=}0.05$) breaks these cycles and enables DQN to reach 2048. For stochastic policy agents (PPO, A2C, SAC), sampling from the learned distribution rather than taking the argmax provides natural cycle-breaking, but their poorly trained policies still cannot reach high tiles.
+
+\subsection{GRPO Training Challenges}
+
+The GRPO training pipeline revealed several stability challenges specific to RLVR on small language models. First, the model reward-hacked the length reward by generating filler text to maximize word count while producing no valid format or direction. Second, the game reward function's $-1.0$ penalty for unparseable outputs dominates the total reward before format is learned, causing the model to diverge. The successful configuration used only format and direction rewards with $\beta{=}0.04$ KL penalty and $10^{-6}$ learning rate. These findings suggest that GRPO reward functions must be carefully staged: structural rewards first, then task rewards, rather than training all components simultaneously.
 
 \subsection{Practical Trade-offs}
 
@@ -487,28 +498,30 @@ The classical agents offer superior performance at dramatically lower computatio
 
 \subsection{Limitations}
 
-Our study has several limitations. First, the training budgets are modest by modern standards; longer training for all agents would clarify convergence behavior. Second, we use a single random seed per agent, precluding statistical significance tests across multiple runs. Third, the LLM's 0.5B parameter scale is at the lower end of practical language models; 7B+ models may exhibit qualitatively different behavior. Finally, we do not explore hybrid approaches (e.g., LLM-guided MCTS) that could combine the interpretability of the LLM with the efficiency of classical search.
+Our study has several limitations. First, the training budgets are modest by modern standards; longer training (5M+ steps) for all agents would clarify convergence behavior. Second, we use a single random seed per agent, precluding statistical significance tests across multiple runs. Third, the LLM's 0.5B parameter scale is at the lower end of practical language models; 7B+ models may exhibit qualitatively different behavior. Fourth, the GRPO training was limited to format+direction rewards only---the full five-component reward function caused collapse, and further reward scheduling experiments are needed. Finally, we do not explore hybrid approaches (e.g., LLM-guided MCTS) that could combine the interpretability of the LLM with the efficiency of classical search.
 
 %%====================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented a systematic comparison of five classical RL agents and an LLM-RLVR agent on the 2048 puzzle game. Our controlled experimental setup---with a shared CNN backbone, identical environment, and consistent reward function---isolates the effect of the learning algorithm from confounding architectural differences. Key findings include:
+We have presented a systematic comparison of six classical RL agents (DQN, PPO, A2C, QR-DQN, SAC, LFA) and an LLM-RLVR agent (Qwen2.5-0.5B + GRPO) on the 2048 puzzle game. Our controlled experimental setup---with a shared CNN backbone, identical environment, shaped reward function, and consistent 1M-step training budget---isolates the effect of the learning algorithm from confounding architectural differences. Key findings include:
 
 \begin{itemize}
-    \item DQN achieves the highest performance (avg.\ score 3,401, tile 512 in 21\% of games), benefiting from off-policy experience replay in this sparse-reward environment.
-    \item On-policy methods (PPO, A2C) struggle with sample efficiency, performing comparably to the random baseline at the tested training budget.
-    \item QR-DQN's distributional approach does not confer an advantage at 500K steps but may benefit from longer training.
-    \item The GRPO-trained LLM learns correct XML formatting and directional diversity within 500 steps, demonstrating RLVR's ability to shape both output structure and task strategy.
+    \item DQN achieves the highest performance (avg.\ score 6,384, tile 1024 in 10\% of games, tile 2048 in hunt mode), benefiting from off-policy experience replay in this sparse-reward environment.
+    \item LFA with only 108 parameters outperforms all deep on-policy methods, demonstrating that domain-specific feature engineering provides a stronger inductive bias than large neural networks for structured games.
+    \item On-policy methods (PPO, A2C) struggle with sample efficiency, performing comparably to the random baseline even with shaped milestone rewards.
+    \item QR-DQN's distributional approach does not confer an advantage at 1M steps; the 100-quantile output head requires proportionally more data to converge.
+    \item Deterministic greedy policies fail at high-tile states; 5\% exploration noise is essential for reaching 2048 in hunt mode.
+    \item The GRPO-trained LLM learns partial format compliance (30--44\%) within 300 steps, but reward function design is critical: length rewards cause collapse, and game rewards must be staged after format learning.
     \item Classical agents are $\sim$400$\times$ faster at inference, but the LLM provides unique interpretability through chain-of-thought reasoning.
 \end{itemize}
 
-Future work includes scaling to larger LLMs (7B+ parameters), implementing curriculum learning with progressive board complexity, exploring hybrid LLM-MCTS approaches, and conducting ablation studies on each GRPO reward component.
+Future work includes scaling to 5M+ training steps for all agents, implementing explicit invalid action masking in SB3 policy heads, staged GRPO training (format $\to$ direction $\to$ game reward), scaling to larger LLMs (7B+ parameters), and exploring hybrid LLM-MCTS approaches that combine interpretability with search efficiency.
 
 %%====================================================================
 \section*{Acknowledgment}
 
-This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at the Khoury College of Computer Sciences, Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 GPU (8\,GB VRAM).
+This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at the Khoury College of Computer Sciences, Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM) with CUDA 12.6.
 
 %%====================================================================
 \begin{thebibliography}{00}
