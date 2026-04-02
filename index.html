@@ -1114,6 +1114,7 @@ function replayStep() {
 let _manifest = null;
 let _replayMode = 'normal';   // 'normal' | 'hunt'
 let _trainingMode = '1m';     // '1m' | '5m'
+let _selectedAgentId = null; // persists across mode switches
 
 // Agent accent colors
 const AGENT_COLORS = {
@@ -1187,17 +1188,22 @@ function _rebuildDropdown() {
     if (isNaN(idx)) return;
     pbStop();
     const agent = _manifest.agents[idx];
+    // Persist selection by base agent id (strip _5m suffix)
+    _selectedAgentId = agent.id?.replace(/_5m$/, '') ?? null;
     const url = _replayUrlFor(agent);
-    // Update agent info bar
     _updateAgentInfoBar(agent);
     if (url) loadReplayFromUrl(url, agent.name + (_replayMode === 'hunt' ? ' (Hunt)' : ''));
   }
 
   sel.onchange = () => _loadSelected(parseInt(sel.value));
 
-  // Auto-load first available
-  sel.value = String(available[0].i);
-  _loadSelected(available[0].i);
+  // Restore previously selected agent if available, else default to first
+  const preferred = _selectedAgentId
+    ? available.find(({a}) => (a.id?.replace(/_5m$/, '') ?? a.id) === _selectedAgentId)
+    : null;
+  const target = preferred ?? available[0];
+  sel.value = String(target.i);
+  _loadSelected(target.i);
 }
 
 function _updateAgentInfoBar(agent) {
