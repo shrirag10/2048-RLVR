@@ -455,6 +455,13 @@ html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
                 <p class="text-on-surface-variant mb-5 text-sm" id="pb-done-txt"></p>
                 <button onclick="pbNewEpisode()" class="px-7 py-2.5 bg-primary text-on-primary font-bold rounded-full sunken-shadow hover:bg-primary-dim transition-all active:scale-95">Replay</button>
               </div>
+              <!-- No-data overlay -->
+              <div id="pb-nodata" class="hidden absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center px-8" style="z-index:10;background:rgba(248,246,243,0.94);backdrop-filter:blur(16px)">
+                <span class="material-symbols-outlined text-[40px] text-on-surface-variant mb-3">terminal</span>
+                <p class="font-headline font-black text-xl text-on-surface mb-1" id="nodata-title">No data available</p>
+                <p class="text-xs text-on-surface-variant mb-4" id="nodata-sub">Run the following command to generate:</p>
+                <code id="nodata-cmd" class="block bg-surface-container text-on-surface font-mono text-xs px-4 py-2.5 rounded-xl mb-2 max-w-full break-all"></code>
+              </div>
             </div>
 
             <!-- Controls -->
@@ -1135,7 +1142,7 @@ function setReplayMode(mode) {
   document.getElementById('mode-hunt-btn').className =
     `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${isHunt ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant'}`;
 
-  // Rebuild dropdown showing only agents that have a replay in this mode
+  // Rebuild dropdown showing all agents
   _rebuildDropdown();
 }
 
@@ -1155,55 +1162,100 @@ function _replayUrlFor(agent) {
   return _replayMode === 'hunt' ? agent.hunt_replay : agent.replay;
 }
 
+function _runCommandFor(agent) {
+  const id = agent.id?.replace(/_5m$/, '') ?? agent.id;
+  const modeSuffix = _trainingMode === '5m' ? ' --mode 5m' : '';
+  if (_replayMode === 'hunt') {
+    return `python -m src.classical.hunt_2048 --agents ${id}${modeSuffix}`;
+  }
+  return `python -m src.classical.export_all${modeSuffix}`;
+}
+
+function _showNoData(agent) {
+  pbStop();
+  document.getElementById('pb-done').classList.add('hidden');
+  const overlay = document.getElementById('pb-nodata');
+  overlay.classList.remove('hidden');
+  // Dark mode support
+  overlay.style.background = document.documentElement.classList.contains('dark')
+    ? 'rgba(26,26,26,0.94)' : 'rgba(248,246,243,0.94)';
+  const modeName = _trainingMode.toUpperCase();
+  const replayName = _replayMode === 'hunt' ? 'Hunt' : 'Normal';
+  document.getElementById('nodata-title').textContent =
+    `No ${replayName} replay — ${modeName}`;
+  document.getElementById('nodata-sub').textContent =
+    `${agent.name} has no ${replayName.toLowerCase()} replay in ${modeName} mode. Run:`;
+  document.getElementById('nodata-cmd').textContent = _runCommandFor(agent);
+
+  // Also clear info bar stats
+  document.getElementById('agent-info-avg').textContent = '—';
+  document.getElementById('agent-info-tile').textContent = '—';
+  document.getElementById('agent-info-moves').textContent = '—';
+  document.getElementById('agent-info-bar').classList.remove('hidden');
+  document.getElementById('agent-info-name').textContent = agent.name;
+  document.getElementById('agent-info-badge').textContent =
+    _trainingMode.toUpperCase() + ' · ' + replayName;
+  const baseId = agent.id?.replace(/_5m$/, '');
+  document.getElementById('agent-info-dot').style.background =
+    AGENT_COLORS[baseId] ?? '#8c4a00';
+}
+
+function _hideNoData() {
+  document.getElementById('pb-nodata').classList.add('hidden');
+}
+
 function _rebuildDropdown() {
   if (!_manifest) return;
   const sel = document.getElementById('agent-select');
   const isHunt = _replayMode === 'hunt';
 
-  // Filter to agents that have a replay in the current mode
-  const available = _manifest.agents
-    .map((a, i) => ({a, i}))
-    .filter(({a}) => isHunt ? !!a.hunt_replay : !!a.replay);
+  // Show ALL agents — mark unavailable ones with ⚠
+  const all = _manifest.agents.map((a, i) => ({a, i}));
 
-  if (!available.length) {
-    sel.innerHTML = isHunt
-      ? '<option value="">⚠ No hunt replays — run hunt_2048.py first</option>'
-      : '<option value="">⚠ No replays — run export_all.py first</option>';
+  if (!all.length) {
+    sel.innerHTML = '<option value="">No agents in manifest</option>';
     sel.disabled = true;
     return;
   }
 
-  sel.innerHTML = available.map(({a, i}) => {
+  sel.innerHTML = all.map(({a, i}) => {
+    const hasData = isHunt ? !!a.hunt_replay : !!a.replay;
     const summary  = isHunt ? a.hunt_replay_summary : (a.replay_summary ?? {});
     const topTile  = summary?.max_tile_ever ?? a.training?.max_tile_ever ?? '?';
-    // Show replay-specific avg score in hunt mode, training avg otherwise
     const avgScore = isHunt
       ? (summary?.avg_score != null ? Math.round(summary.avg_score).toLocaleString() : '?')
       : (a.training?.avg_score != null ? Math.round(a.training.avg_score).toLocaleString() : '?');
-    return `<option value="${i}">${a.name}  ·  avg ${avgScore}  ·  top ${topTile}</option>`;
+    const prefix = hasData ? '' : '⚠ ';
+    const suffix = hasData ? `  ·  avg ${avgScore}  ·  top ${topTile}` : '  ·  no data';
+    return `<option value="${i}">${prefix}${a.name}${suffix}</option>`;
   }).join('');
   sel.disabled = false;
 
   function _loadSelected(idx) {
     if (isNaN(idx)) return;
-    pbStop();
     const agent = _manifest.agents[idx];
-    // Persist selection by base agent id (strip _5m suffix)
+    const hasData = isHunt ? !!agent.hunt_replay : !!agent.replay;
     _selectedAgentId = agent.id?.replace(/_5m$/, '') ?? null;
-    const url = _replayUrlFor(agent);
+    if (!hasData) {
+      _showNoData(agent);
+      return;
+    }
+    _hideNoData();
+    pbStop();
     _updateAgentInfoBar(agent);
-    if (url) loadReplayFromUrl(url, agent.name + (_replayMode === 'hunt' ? ' (Hunt)' : ''));
+    const url = _replayUrlFor(agent);
+    if (url) loadReplayFromUrl(url, agent.name + (isHunt ? ' (Hunt)' : ''));
   }
 
   sel.onchange = () => _loadSelected(parseInt(sel.value));
 
-  // Restore previously selected agent if available, else default to first
-  const preferred = _selectedAgentId
-    ? available.find(({a}) => (a.id?.replace(/_5m$/, '') ?? a.id) === _selectedAgentId)
+  // Restore previously selected agent if in manifest, else first
+  const preferredEntry = _selectedAgentId
+    ? all.find(({a}) => (a.id?.replace(/_5m$/, '') ?? a.id) === _selectedAgentId)
     : null;
-  const target = preferred ?? available[0];
-  sel.value = String(target.i);
-  _loadSelected(target.i);
+  const targetIdx = (preferredEntry ?? all[0]).i;
+  sel.value = String(targetIdx);
+  _loadSelected(targetIdx);
 }
 
 function _updateAgentInfoBar(agent) {
