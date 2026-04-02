@@ -63,6 +63,7 @@ html.dark .sunken-shadow{box-shadow:0 24px 48px -12px rgba(0,0,0,0.3)}
 html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
 .bar-animate{transition:height 0.6s cubic-bezier(.22,.68,0,1.2)}
 .prob-bar{transition:width 0.25s ease}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#deddd9;border-radius:99px}
 </style>
 </head>
@@ -350,16 +351,21 @@ html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
 
           <!-- Left: board + controls -->
           <div class="shrink-0">
-            <div class="flex flex-wrap items-center gap-3 mb-6">
+            <!-- ── Playback controls row ──────────────────────────── -->
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+
+              <!-- Agent dropdown -->
               <div class="flex items-center gap-2">
-                <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Agent</label>
+                <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Agent</label>
                 <select id="agent-select" disabled
-                  class="bg-surface-container text-on-surface text-sm font-semibold px-3 py-2 rounded-xl outline-none min-w-[220px]">
+                  class="bg-surface-container text-on-surface text-sm font-semibold px-3 py-2 rounded-xl outline-none min-w-[200px]">
                   <option value="">⏳ Loading agents…</option>
                 </select>
               </div>
+
+              <!-- Speed -->
               <div class="flex items-center gap-2">
-                <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Speed</label>
+                <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Speed</label>
                 <select id="speed-select" class="bg-surface-container text-on-surface text-sm font-semibold px-3 py-2 rounded-xl outline-none">
                   <option value="600">Slow</option>
                   <option value="300" selected>Normal</option>
@@ -367,19 +373,63 @@ html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
                   <option value="20">Turbo</option>
                 </select>
               </div>
-              <!-- Training mode toggle: 1M vs 5M -->
-              <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1 ml-auto">
-                <button id="train-1m-btn" onclick="setTrainingMode('1m')"
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
-                <button id="train-5m-btn" onclick="setTrainingMode('5m')"
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
+
+              <!-- Spacer -->
+              <div class="flex-1"></div>
+
+              <!-- Training steps -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Training</span>
+                <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+                  <button id="train-1m-btn" onclick="setTrainingMode('1m')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
+                  <button id="train-5m-btn" onclick="setTrainingMode('5m')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
+                </div>
               </div>
-              <!-- Mode toggle: Normal replay vs Hunt-2048 replay -->
-              <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1 ml-auto">
-                <button id="mode-normal-btn" onclick="setReplayMode('normal')"
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">Normal</button>
-                <button id="mode-hunt-btn" onclick="setReplayMode('hunt')"
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">Hunt 2048</button>
+
+              <!-- Replay mode -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Replay Mode</span>
+                <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+                  <button id="mode-normal-btn" onclick="setReplayMode('normal')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">Normal</button>
+                  <button id="mode-hunt-btn" onclick="setReplayMode('hunt')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">🎯 Hunt</button>
+                </div>
+              </div>
+
+              <!-- Refresh -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Refresh</span>
+                <button onclick="refreshPlayback()" title="Reload agents from manifest"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-xl transition-all text-xs font-bold">
+                  <span class="material-symbols-outlined text-[16px]">refresh</span>
+                  Reload
+                </button>
+              </div>
+            </div>
+
+            <!-- ── Agent info card (updates on agent select) ────────── -->
+            <div id="agent-info-bar" class="hidden mb-4 bg-surface-container-low rounded-2xl px-5 py-3 flex items-center gap-6">
+              <div class="flex items-center gap-2">
+                <span id="agent-info-dot" class="inline-block w-3 h-3 rounded-full bg-primary"></span>
+                <span id="agent-info-name" class="font-headline font-black text-sm">—</span>
+                <span id="agent-info-badge" class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-primary-container text-on-primary-container rounded-full">1M</span>
+              </div>
+              <div class="flex gap-5 ml-auto">
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Avg Score</p>
+                  <p id="agent-info-avg" class="font-headline font-black text-lg">—</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Max Tile</p>
+                  <p id="agent-info-tile" class="font-headline font-black text-lg">—</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Avg Moves</p>
+                  <p id="agent-info-moves" class="font-headline font-black text-lg">—</p>
+                </div>
               </div>
             </div>
 
@@ -1125,34 +1175,67 @@ function _rebuildDropdown() {
   sel.innerHTML = available.map(({a, i}) => {
     const summary  = isHunt ? a.hunt_replay_summary : (a.replay_summary ?? {});
     const topTile  = summary?.max_tile_ever ?? a.training?.max_tile_ever ?? '?';
-    const avgScore = a.training?.avg_score != null
-      ? Math.round(a.training.avg_score).toLocaleString() : '?';
-    const tag = isHunt ? ' 🎯' : '';
-    return `<option value="${i}">${a.name}${tag}  ·  avg ${avgScore}  ·  top ${topTile}</option>`;
+    // Show replay-specific avg score in hunt mode, training avg otherwise
+    const avgScore = isHunt
+      ? (summary?.avg_score != null ? Math.round(summary.avg_score).toLocaleString() : '?')
+      : (a.training?.avg_score != null ? Math.round(a.training.avg_score).toLocaleString() : '?');
+    return `<option value="${i}">${a.name}  ·  avg ${avgScore}  ·  top ${topTile}</option>`;
   }).join('');
   sel.disabled = false;
 
-  sel.onchange = () => {
-    const idx = parseInt(sel.value);
-    if (!isNaN(idx)) {
-      pbStop();
-      const agent = _manifest.agents[idx];
-      const url = _replayUrlFor(agent);
-      if (url) loadReplayFromUrl(url, agent.name + (_replayMode === 'hunt' ? ' (Hunt)' : ''));
-    }
-  };
+  function _loadSelected(idx) {
+    if (isNaN(idx)) return;
+    pbStop();
+    const agent = _manifest.agents[idx];
+    const url = _replayUrlFor(agent);
+    // Update agent info bar
+    _updateAgentInfoBar(agent);
+    if (url) loadReplayFromUrl(url, agent.name + (_replayMode === 'hunt' ? ' (Hunt)' : ''));
+  }
+
+  sel.onchange = () => _loadSelected(parseInt(sel.value));
 
   // Auto-load first available
-  const first = available[0];
-  const url = _replayUrlFor(first.a);
-  if (url) loadReplayFromUrl(url, first.a.name + (isHunt ? ' (Hunt)' : ''));
+  sel.value = String(available[0].i);
+  _loadSelected(available[0].i);
+}
+
+function _updateAgentInfoBar(agent) {
+  const isHunt = _replayMode === 'hunt';
+  const summary = isHunt ? agent.hunt_replay_summary : (agent.replay_summary ?? {});
+  const training = agent.training ?? {};
+
+  const bar = document.getElementById('agent-info-bar');
+  bar.classList.remove('hidden');
+
+  document.getElementById('agent-info-name').textContent = agent.name;
+  document.getElementById('agent-info-badge').textContent = _trainingMode.toUpperCase() + (isHunt ? ' · Hunt' : '');
+
+  // Color dot from AGENT_COLORS
+  const baseId = agent.id?.replace(/_5m$/, '');
+  const color = AGENT_COLORS[baseId] ?? '#8c4a00';
+  document.getElementById('agent-info-dot').style.background = color;
+
+  // Avg score: use replay summary when available, fall back to training
+  const avgScore = summary?.avg_score ?? training?.avg_score;
+  document.getElementById('agent-info-avg').textContent =
+    avgScore != null ? Math.round(avgScore).toLocaleString() : '—';
+
+  // Max tile
+  const maxTile = summary?.max_tile_ever ?? training?.max_tile_ever;
+  document.getElementById('agent-info-tile').textContent = maxTile ?? '—';
+
+  // Avg moves
+  const avgMoves = summary?.avg_moves ?? training?.avg_moves;
+  document.getElementById('agent-info-moves').textContent =
+    avgMoves != null ? Math.round(avgMoves) : '—';
 }
 
 async function loadManifest() {
   const sel = document.getElementById('agent-select');
   const manifestFile = _trainingMode === '5m' ? 'logs/manifest_5m.json' : 'logs/manifest.json';
   try {
-    const res = await fetch(manifestFile);
+    const res = await fetch(manifestFile + '?t=' + Date.now()); // cache-bust
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _manifest = await res.json();
   } catch(e) {
@@ -1166,6 +1249,17 @@ async function loadManifest() {
     return;
   }
   _rebuildDropdown();
+}
+
+async function refreshPlayback() {
+  const btn = document.querySelector('[onclick="refreshPlayback()"]');
+  const icon = btn?.querySelector('.material-symbols-outlined');
+  if (icon) { icon.style.animation = 'spin 0.7s linear infinite'; }
+  _manifest = null;
+  bmInited = false;
+  document.getElementById('agent-info-bar').classList.add('hidden');
+  await loadManifest();
+  if (icon) { icon.style.animation = ''; }
 }
 
 async function loadReplayFromUrl(url, label) {
