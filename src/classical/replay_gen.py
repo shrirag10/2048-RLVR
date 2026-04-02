@@ -221,7 +221,7 @@ def generate_replays(
         from src.classical.dqn_agent import DQNAgent
         agent = DQNAgent()
         agent.load(model_path)
-        agent.epsilon = 0.0
+        agent.epsilon = 0.05  # small noise breaks deterministic cycles at high tiles
         runner = lambda env: _dqn_episode(agent, env)
 
     elif agent_type == "sac":
@@ -231,12 +231,16 @@ def generate_replays(
         runner = lambda env: _sac_episode(agent, env)
 
     elif agent_type == "ppo":
-        from stable_baselines3 import PPO
         from src.classical.ppo_agent import Game2048CNN
-        # Env only used for space shape during load; we create fresh envs per attempt
         _env0 = Gym2048Env(seed=seed)
-        model = PPO.load(model_path, env=_env0,
-                         custom_objects={"features_extractor_class": Game2048CNN})
+        try:
+            from sb3_contrib import MaskablePPO
+            model = MaskablePPO.load(model_path, env=_env0,
+                                     custom_objects={"features_extractor_class": Game2048CNN})
+        except Exception:
+            from stable_baselines3 import PPO
+            model = PPO.load(model_path, env=_env0,
+                             custom_objects={"features_extractor_class": Game2048CNN})
         _env0.close()
         runner = lambda env: _sb3_episode(model, env, "ppo")
 
@@ -263,7 +267,7 @@ def generate_replays(
 
         agent = LinearFAAgent()
         agent.load(model_path)
-        agent.epsilon = 0.0   # greedy evaluation
+        agent.epsilon = 0.05  # small noise breaks deterministic cycles at high tiles   # greedy evaluation
 
         def _lfa_episode(env: Gym2048Env) -> tuple[list[dict], dict]:
             obs, info = env.reset()

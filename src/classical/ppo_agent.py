@@ -168,7 +168,7 @@ def train_ppo(
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
         "features_extractor_kwargs": {"features_dim": 512},
-        "net_arch": [{"pi": [256, 256], "vf": [256, 256]}],
+        "net_arch": {"pi": [256, 256], "vf": [256, 256]},
     }
 
     # Create PPO model

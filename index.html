@@ -304,11 +304,19 @@ html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
           </div>
         </div>
 
-        <!-- Action Distribution Summary -->
+        <!-- 1M vs 5M Comparison -->
         <div class="bg-surface-container-low rounded-3xl p-7 mb-8">
-          <h3 class="font-headline font-bold text-lg mb-1">Action Distribution Summary</h3>
-          <p class="text-xs text-on-surface-variant mb-5">Overall action usage per agent (%)</p>
-          <canvas id="chartActionDist" height="180"></canvas>
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <h3 class="font-headline font-bold text-lg">1M vs 5M Training Comparison</h3>
+              <p class="text-xs text-on-surface-variant mt-0.5">Side-by-side agent performance at 1M and 5M training steps</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="cmp-score-btn" onclick="setCmpMetric('avg_score')" class="px-3 py-1 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">Avg Score</button>
+              <button id="cmp-tile-btn" onclick="setCmpMetric('max_tile')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant transition-all">Max Tile</button>
+            </div>
+          </div>
+          <canvas id="chartCompare" height="240"></canvas>
         </div>
 
         <!-- Scaling Curves: 1M vs 5M -->
@@ -1343,7 +1351,7 @@ function setBmTrainingMode(mode) {
   if (chartTile) { chartTile.destroy(); chartTile = null; }
   if (chartEpLength) { chartEpLength.destroy(); chartEpLength = null; }
   if (chartWinRate) { chartWinRate.destroy(); chartWinRate = null; }
-  if (chartActionDist) { chartActionDist.destroy(); chartActionDist = null; }
+  if (chartCompare) { chartCompare.destroy(); chartCompare = null; }
   initBenchmark();
   // Reload manifest for playback too
   loadManifest();
@@ -1352,7 +1360,7 @@ function setBmTrainingMode(mode) {
 /* ═════════════════════════════════════════════════════════
    BENCHMARK EXTRA CHARTS (Episode Length, Win Rate, Action Dist)
 ═════════════════════════════════════════════════════════ */
-let chartEpLength = null, chartWinRate = null, chartActionDist = null;
+let chartEpLength = null, chartWinRate = null, chartCompare = null;
 
 /* Inject extra benchmark charts — called at end of initBenchmark */
 const _origInitBenchmark = initBenchmark;
@@ -1438,40 +1446,109 @@ async function _buildExtraBenchmarkCharts() {
     });
   }
 
-  /* Action Distribution Summary (horizontal stacked bar) */
-  const actionLabels = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
-  const actionColors = ['#8c4a00', '#705900', '#ac292e', '#1a6b3a'];
-  if (!chartActionDist) {
-    const actionDatasets = actionLabels.map((lbl, ai) => ({
-      label: lbl,
-      data: agents.map(a => {
-        const total = a.rows.length;
-        if (!total) return 0;
-        // Count actions from CSV if action column exists, else estimate from replay data
-        const actions = a.rows.map(r => +r.action).filter(v => !isNaN(v));
-        if (actions.length) {
-          const count = actions.filter(act => act === ai).length;
-          return +((count / actions.length) * 100).toFixed(1);
-        }
-        return 25; // fallback uniform
-      }),
-      backgroundColor: actionColors[ai],
-    }));
-    chartActionDist = new Chart(document.getElementById('chartActionDist'), {
-      type: 'bar',
-      data: { labels: agents.map(a => a.name), datasets: actionDatasets },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
-        scales: {
-          x: { stacked: true, max: 100, ticks: { font: { family: 'Inter', size: 10 }, callback: v => v + '%' },
-               grid: { color: 'rgba(0,0,0,0.04)' } },
-          y: { stacked: true, ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } }
+  /* 1M vs 5M Comparison — always loads both manifests fresh */
+  initCompareChart();
+}
+
+/* ═════════════════════════════════════════════════════════
+   1M vs 5M COMPARISON CHART
+═════════════════════════════════════════════════════════ */
+let _cmpMetric = 'avg_score';
+
+function setCmpMetric(metric) {
+  _cmpMetric = metric;
+  document.getElementById('cmp-score-btn').className =
+    `px-3 py-1 text-xs font-bold rounded-lg transition-all ${metric === 'avg_score' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('cmp-tile-btn').className =
+    `px-3 py-1 text-xs font-bold rounded-lg transition-all ${metric === 'max_tile' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  renderCompareChart();
+}
+
+async function initCompareChart() {
+  renderCompareChart();
+}
+
+async function _loadAgentStats(manifestUrl) {
+  try {
+    const r = await fetch(manifestUrl);
+    if (!r.ok) return [];
+    const manifest = await r.json();
+    return manifest.agents
+      .filter(a => a.replay_summary)
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        avg_score: a.replay_summary.avg_score ?? 0,
+        max_tile:  a.replay_summary.max_tile_ever ?? 0,
+      }));
+  } catch(e) { return []; }
+}
+
+async function renderCompareChart() {
+  const canvas = document.getElementById('chartCompare');
+  if (!canvas) return;
+  if (chartCompare) { chartCompare.destroy(); chartCompare = null; }
+
+  // Always load both 1M and 5M fresh, independent of current training mode
+  const [agents1m, agents5m] = await Promise.all([
+    _loadAgentStats('logs/manifest.json'),
+    _loadAgentStats('logs/manifest_5m.json'),
+  ]);
+
+  if (!agents1m.length) return;
+
+  const labels = agents1m.map(a => a.name);
+  const get1m = a => _cmpMetric === 'avg_score' ? a.avg_score : a.max_tile;
+  const get5m = id => {
+    const a5 = agents5m.find(a => a.id === id);
+    return a5 ? (_cmpMetric === 'avg_score' ? a5.avg_score : a5.max_tile) : null;
+  };
+
+  const yLabel = _cmpMetric === 'avg_score' ? 'Avg Score' : 'Max Tile Reached';
+
+  chartCompare = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '1M Steps',
+          data: agents1m.map(a => get1m(a)),
+          backgroundColor: agents1m.map(a => (AGENT_COLORS[a.id] || '#777') + 'cc'),
+          borderColor:     agents1m.map(a => AGENT_COLORS[a.id] || '#777'),
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+        {
+          label: '5M Steps',
+          data: agents1m.map(a => get5m(a.id)),
+          backgroundColor: agents1m.map(a => (AGENT_COLORS[a.id] || '#777') + '55'),
+          borderColor:     agents1m.map(a => AGENT_COLORS[a.id] || '#777'),
+          borderWidth: 2,
+          borderDash: [4, 4],
+          borderRadius: 6,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? (_cmpMetric === 'avg_score' ? Math.round(ctx.parsed.y).toLocaleString() : ctx.parsed.y) : 'No data'}`
+        }}
+      },
+      scales: {
+        x: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        y: {
+          ticks: { font: { family: 'Inter', size: 10 }, callback: v => _cmpMetric === 'avg_score' && v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          title: { display: true, text: yLabel, font: { family: 'Inter', size: 10 } },
+          beginAtZero: true
         }
       }
-    });
-  }
+    }
+  });
 }
 
 /* ═════════════════════════════════════════════════════════
