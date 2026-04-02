@@ -335,22 +335,6 @@ html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
           <canvas id="chartCompare" height="240"></canvas>
         </div>
 
-        <!-- Scaling Curves: 1M vs 5M -->
-        <div class="bg-surface-container-low rounded-3xl p-7 mb-8">
-          <div class="flex justify-between items-start mb-6">
-            <div>
-              <h3 class="font-headline font-bold text-lg">Scaling Curves</h3>
-              <p class="text-xs text-on-surface-variant mt-0.5">Agent performance at 50k, 100k, 200k, 500k, 1M, 2M, 5M training steps</p>
-            </div>
-            <div class="flex gap-2">
-              <button id="scale-score-btn" onclick="setScalingMetric('avg_score')" class="px-3 py-1 text-xs font-bold rounded-lg bg-primary text-on-primary">Score</button>
-              <button id="scale-tile-btn" onclick="setScalingMetric('reach_512')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant">512+ Rate</button>
-              <button id="scale-1024-btn" onclick="setScalingMetric('reach_1024')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant">1024+ Rate</button>
-            </div>
-          </div>
-          <canvas id="chartScaling" height="250"></canvas>
-          <p class="text-[10px] text-on-surface-variant mt-3 text-center">Run: <code class="bg-surface-container px-1.5 py-0.5 rounded">python3 -m src.classical.scaling_eval</code> to generate data</p>
-        </div>
 
         <!-- Board topology -->
         <div class="bg-surface-container-lowest rounded-3xl p-10 text-center" style="border:1px solid rgba(174,173,170,0.15)">
