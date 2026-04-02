@@ -315,7 +315,7 @@ def main():
         generate_replays(
             agent_type=args.agent,
             model_path=args.model,
-            n_episodes=args.episodes,
+            max_attempts=args.episodes,
             seed=args.seed,
             output_path=args.output,
         )

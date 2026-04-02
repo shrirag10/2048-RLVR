@@ -787,27 +787,15 @@ async function initBenchmark() {
   });
 
   /* fetch & parse all CSVs in parallel.
-     In 5M mode: try logs/{id}_5m/ first (for agents retrained in a _5m dir),
-     then fall back to logs/{id}/ (for agents whose 5M run lived in the base dir). */
+     In 5M mode: only try logs/{id}_5m/ — no fallback to base dir. */
   const modeSuffix = _trainingMode === '5m' ? '_5m' : '';
   const loaded = await Promise.all(AGENT_DEFS.map(async def => {
     try {
-      // Build candidate URLs: suffixed dir first, then base dir as fallback
-      const urls = modeSuffix
-        ? [`logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`,
-           `logs/${def.id}/${def.id}_metrics.csv`]
-        : [`logs/${def.id}/${def.id}_metrics.csv`];
-
-      let rows = null;
-      for (const url of urls) {
-        try {
-          const r = await fetch(url);
-          if (!r.ok) continue;
-          const parsed = _parseCSV(await r.text());
-          if (parsed.length) { rows = parsed; break; }
-        } catch(_) { continue; }
-      }
-      if (!rows) return null;
+      const url = `logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const rows = _parseCSV(await r.text());
+      if (!rows.length) return null;
 
       const scores = rows.map(r => +r.total_score);
       const tiles  = rows.map(r => +r.max_tile);
