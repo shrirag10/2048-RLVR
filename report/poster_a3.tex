@@ -1,0 +1,9 @@
+\documentclass[a3paper]{article}
+\usepackage[margin=0pt]{geometry}
+\usepackage{pdfpages}
+
+\begin{document}
+% Include the A4 visually-designed poster and scale it perfectly to fill the A3 sheet area.
+% Scaling from A4 to A3 is exactly \sqrt{2} (1.414). This keeps all proportions flawless.
+\includepdf[pages=-, width=\paperwidth, height=\paperheight, keepaspectratio]{poster_visual.pdf}
+\end{document}

@@ -91,12 +91,12 @@ def make_game_reward_adapter(dataset):
 def train_grpo(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
     dataset_size: int = 10_000,
-    num_generations: int = 8,
+    num_generations: int = 4,
     max_completion_length: int = 128,
-    learning_rate: float = 5e-6,
+    learning_rate: float = 1e-6,
     num_train_epochs: int = 3,
     per_device_batch_size: int = 1,
-    gradient_accumulation_steps: int = 4,
+    gradient_accumulation_steps: int = 2,
     lora_r: int = 16,
     lora_alpha: int = 16,
     max_seq_length: int = 640,  # MUST equal max_prompt_length + max_completion_length exactly
@@ -270,8 +270,8 @@ def train_grpo(
         optim="adamw_8bit",
         num_iterations=1,         # 2+ causes completion length drift in Unsloth GRPO
         temperature=0.7,           # lower = less random = stronger signal
-        beta=0.2,                  # stronger KL penalty (was 0.04 — caused divergence)
-        max_grad_norm=1.0,         # standard clip value
+        beta=4.0,                  # very strong KL penalty — prevents catastrophic divergence
+        max_grad_norm=0.1,         # aggressive clip — prior runs hit grad_norm=74k
         reward_weights={
             1: [0.6, 0.4],              # stage 1: format + direction only
             2: [0.4, 0.3, 0.3],         # stage 2: + game reward
