@@ -333,9 +333,9 @@ class DiscreteSACAgent:
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
-        # Clamp log_alpha to prevent divergence (α ∈ [~0.05, ~20])
+        # Clamp log_alpha to prevent divergence (α ∈ [~0.002, ~2.7])
         with torch.no_grad():
-            self.log_alpha.clamp_(-3.0, 3.0)  # wider range: lets α fall for exploitation
+            self.log_alpha.clamp_(-6.0, 1.0)  # old range [-3,3] let α hit 20 and stay stuck
 
         # ─── Soft Target Update ───────────────────────────────
         for param, target_param in zip(self.online.parameters(), self.target.parameters()):
@@ -390,6 +390,8 @@ def train_sac(
     buffer_size: int = 200_000,               # bigger buffer for off-policy diversity
     batch_size: int = 256,                    # larger batch for stable twin-Q updates
     learning_starts: int = 10_000,            # collect diverse initial data
+    update_every: int = 4,                    # update every N steps (not every step — 4x speedup)
+    gradient_steps: int = 2,                  # compensate with 2 gradient steps per update
     n_envs: int = 8,                          # parallel envs for speed
     device: str = "auto",
 ) -> DiscreteSACAgent:
@@ -490,8 +492,9 @@ def train_sac(
                     ep_max_tile[i] = 0
                     ep_starts_v[i] = time.time()
 
-            if step * n_envs >= learning_starts:
-                agent.update()
+            if step * n_envs >= learning_starts and step % update_every == 0:
+                for _ in range(gradient_steps):
+                    agent.update()
 
             obs_v = next_obs_v
             infos_v = next_infos_v
