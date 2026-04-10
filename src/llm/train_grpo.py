@@ -419,7 +419,7 @@ def main():
     parser.add_argument("--dataset-size", type=int, default=10_000)
     parser.add_argument("--num-generations", type=int, default=4)
     parser.add_argument("--max-completion", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=5e-6)
+    parser.add_argument("--lr", type=float, default=1e-6)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=1)
