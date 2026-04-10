@@ -32,11 +32,12 @@ $PYTHON -m src.llm.train_grpo \
     --stage 2 --steps 500
 
 echo ""
-echo "▶ Agent 1: Generating replays..."
-$PYTHON -m src.classical.train replay \
-    --agent grpo --model "$AGENT1_DIR/merged" \
-    --episodes 20 --output "$AGENT1_DIR/replays.json" 2>/dev/null || \
-    echo "  [warn] Replay gen failed for 0.5B — skipping"
+echo "▶ Agent 1: Generating replay..."
+$PYTHON -m src.llm.replay_gen \
+    --model-path "$AGENT1_DIR/adapter" \
+    --log-dir "$AGENT1_DIR" \
+    --manifest logs/manifest.json \
+    --max-turns 500 || echo "  [warn] Replay gen failed for 0.5B — skipping"
 
 echo "✅ Agent 1 complete: $AGENT1_DIR"
 
@@ -67,11 +68,12 @@ $PYTHON -m src.llm.train_grpo \
     --stage 3 --steps 500
 
 echo ""
-echo "▶ Agent 2: Generating replays..."
-$PYTHON -m src.classical.train replay \
-    --agent grpo --model "$AGENT2_DIR/merged" \
-    --episodes 20 --output "$AGENT2_DIR/replays.json" 2>/dev/null || \
-    echo "  [warn] Replay gen failed for 1.5B — skipping"
+echo "▶ Agent 2: Generating replay..."
+$PYTHON -m src.llm.replay_gen \
+    --model-path "$AGENT2_DIR/adapter" \
+    --log-dir "$AGENT2_DIR" \
+    --manifest logs/manifest.json \
+    --max-turns 500 || echo "  [warn] Replay gen failed for 1.5B — skipping"
 
 echo "✅ Agent 2 complete: $AGENT2_DIR"
 
@@ -83,5 +85,4 @@ echo "════════════════════════�
 echo "  Agent 1 (0.5B): $AGENT1_DIR"
 echo "  Agent 2 (1.5B): $AGENT2_DIR"
 echo ""
-echo "  To update the dashboard manifests, run:"
-echo "    python3 -m src.classical.export_all"
+echo "  Dashboard manifests auto-updated."

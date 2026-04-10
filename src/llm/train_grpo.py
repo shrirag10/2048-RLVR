@@ -216,12 +216,8 @@ def train_grpo(
             load_in_4bit=True,
             dtype=None,
         )
-        # Re-enable training on the loaded adapter
-        from peft import PeftModel
-        if isinstance(model, PeftModel):
-            for param in model.parameters():
-                if param.requires_grad is False and 'lora' in str(param):
-                    param.requires_grad = True
+        # Unsloth provides for_training() to re-enable gradient computation
+        FastLanguageModel.for_training(model)
     else:
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=model_name,
