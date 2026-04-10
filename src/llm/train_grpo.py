@@ -91,12 +91,12 @@ def make_game_reward_adapter(dataset):
 def train_grpo(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
     dataset_size: int = 10_000,
-    num_generations: int = 4,
+    num_generations: int = 8,
     max_completion_length: int = 128,
-    learning_rate: float = 1e-6,
+    learning_rate: float = 5e-6,
     num_train_epochs: int = 3,
     per_device_batch_size: int = 1,
-    gradient_accumulation_steps: int = 2,
+    gradient_accumulation_steps: int = 4,
     lora_r: int = 16,
     lora_alpha: int = 16,
     max_seq_length: int = 640,  # MUST equal max_prompt_length + max_completion_length exactly
@@ -105,6 +105,7 @@ def train_grpo(
     config_path: Optional[str] = None,
     steps: Optional[int] = None,
     stage: int = 1,
+    resume_from: Optional[str] = None,
 ):
     """
     Train the LLM agent using GRPO.
@@ -141,6 +142,7 @@ def train_grpo(
         gradient_accumulation_steps=gradient_accumulation_steps,
         lora_r=lora_r, lora_alpha=lora_alpha, max_seq_length=max_seq_length,
         output_dir=output_dir, seed=seed, steps=steps,
+        resume_from=resume_from,
     )
 
     # Load config overrides — mutating cfg directly works correctly
@@ -169,6 +171,7 @@ def train_grpo(
     output_dir             = cfg["output_dir"]
     seed                   = cfg["seed"]
     steps                  = cfg["steps"]
+    resume_from            = cfg["resume_from"]
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -198,31 +201,49 @@ def train_grpo(
     gc.collect()
 
     # ─── Step 2: Load model with Unsloth ───────────────────────────
-    print("\n[2/4] Loading model with Unsloth QLoRA 4-bit...")
+    if resume_from:
+        print(f"\n[2/4] Resuming from adapter: {resume_from}")
+    else:
+        print("\n[2/4] Loading model with Unsloth QLoRA 4-bit...")
 
     from unsloth import FastLanguageModel
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_length,
-        load_in_4bit=True,
-        dtype=None,  # Auto-detect
-    )
+    if resume_from and os.path.exists(resume_from):
+        # Load base model + existing adapter for continued training
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=resume_from,
+            max_seq_length=max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
+        # Re-enable training on the loaded adapter
+        from peft import PeftModel
+        if isinstance(model, PeftModel):
+            for param in model.parameters():
+                if param.requires_grad is False and 'lora' in str(param):
+                    param.requires_grad = True
+    else:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=model_name,
+            max_seq_length=max_seq_length,
+            load_in_4bit=True,
+            dtype=None,  # Auto-detect
+        )
 
-    # Apply LoRA adapters
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=lora_r,
-        lora_alpha=lora_alpha,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
-        lora_dropout=0.0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=seed,
-    )
+        # Apply LoRA adapters
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj",
+            ],
+            lora_dropout=0.0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=seed,
+        )
 
     print(f"  Model loaded. Trainable params: {model.print_trainable_parameters()}")
 
@@ -252,9 +273,9 @@ def train_grpo(
         report_to="none",  # Use our custom logging
         optim="adamw_8bit",
         num_iterations=1,         # 2+ causes completion length drift in Unsloth GRPO
-        temperature=0.9,
-        beta=0.04,
-        max_grad_norm=0.5,        # clip exploding gradients
+        temperature=0.7,           # lower = less random = stronger signal
+        beta=0.2,                  # stronger KL penalty (was 0.04 — caused divergence)
+        max_grad_norm=1.0,         # standard clip value
         reward_weights={
             1: [0.6, 0.4],              # stage 1: format + direction only
             2: [0.4, 0.3, 0.3],         # stage 2: + game reward
@@ -412,6 +433,7 @@ def main():
     parser.add_argument("--output-dir", default="logs/grpo")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--config", default=None, help="YAML config file")
+    parser.add_argument("--resume", default=None, help="Path to adapter dir to resume from")
     parser.add_argument("--stage", type=int, default=1, choices=[1, 2, 3],
                         help="Training stage: 1=format+direction, 2=+game reward, 3=all rewards")
 
@@ -432,6 +454,7 @@ def main():
         seed=args.seed,
         config_path=args.config,
         steps=args.steps,
+        resume_from=args.resume,
         stage=args.stage,
     )
 
