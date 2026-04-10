@@ -128,19 +128,20 @@ def train_qrdqn(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/qrdqn",
-    reward_mode: str = "shaped",               # milestone bonuses at 256/512/1024/2048
+    reward_mode: str = "score_delta",              # match DQN — distributional RL works best with simple rewards
     seed: int = 42,
-    lr: float = 1e-4,                          # match DQN's learning rate
-    buffer_size: int = 300_000,
-    batch_size: int = 64,                      # match DQN batch size
-    gamma: float = 0.995,
-    exploration_fraction: float = 0.2,         # converge earlier (was 0.5)
-    exploration_final_eps: float = 0.01,
-    n_quantiles: int = 50,                     # fewer quantiles = less overhead (was 100)
-    target_update_interval: int = 500,
-    train_freq: int = 1,
-    learning_starts: int = 5_000,              # learn sooner (was 10k)
-    n_envs: int = 8,                           # match PPO/A2C parallelism (was 4)
+    lr: float = 6.3e-5,                            # slightly lower than DQN — distributional needs stability
+    buffer_size: int = 500_000,                     # bigger buffer for off-policy data diversity
+    batch_size: int = 128,                          # larger batch for better quantile gradient estimates
+    gamma: float = 0.99,                            # match DQN — 0.995 was too high
+    exploration_fraction: float = 0.4,              # explore longer — 40% of total steps
+    exploration_final_eps: float = 0.02,            # slightly higher floor than DQN
+    n_quantiles: int = 200,                         # more quantiles = finer return distribution
+    target_update_interval: int = 1000,             # less frequent target sync for stability
+    train_freq: int = 4,                            # train every 4 steps — less aggressive
+    learning_starts: int = 20_000,                  # collect more diverse initial data
+    gradient_steps: int = 1,
+    n_envs: int = 8,
     device: str = "auto",
 ) -> QRDQN:
     """
@@ -184,6 +185,7 @@ def train_qrdqn(
         exploration_final_eps=exploration_final_eps,
         target_update_interval=target_update_interval,
         train_freq=train_freq,
+        gradient_steps=gradient_steps,
         learning_starts=learning_starts,
         policy_kwargs=policy_kwargs,
         verbose=0,

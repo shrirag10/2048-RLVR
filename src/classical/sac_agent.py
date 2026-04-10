@@ -147,13 +147,13 @@ class DiscreteSACAgent:
 
     def __init__(
         self,
-        lr: float = 3e-4,
+        lr: float = 1e-4,
         gamma: float = 0.99,
         tau: float = 0.005,
-        buffer_size: int = 50_000,
-        batch_size: int = 64,
-        learning_starts: int = 5000,
-        target_entropy_ratio: float = 0.5,
+        buffer_size: int = 200_000,
+        batch_size: int = 256,
+        learning_starts: int = 10_000,
+        target_entropy_ratio: float = 0.4,       # lower → less entropy → more exploitation
         device: str = "auto",
     ):
         if device == "auto":
@@ -170,7 +170,7 @@ class DiscreteSACAgent:
         self.target = DiscreteSACNetwork().to(self.device)
         self.target.load_state_dict(self.online.state_dict())
 
-        # Optimizers
+        # Optimizers — critic includes backbone so Q-networks can learn features
         self.actor_optimizer = Adam(
             list(self.online.backbone.parameters()) +
             list(self.online.fc.parameters()) +
@@ -178,6 +178,8 @@ class DiscreteSACAgent:
             lr=lr,
         )
         self.critic_optimizer = Adam(
+            list(self.online.backbone.parameters()) +
+            list(self.online.fc.parameters()) +
             list(self.online.q1.parameters()) +
             list(self.online.q2.parameters()),
             lr=lr,
@@ -380,15 +382,15 @@ def train_sac(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/sac",
-    reward_mode: str = "shaped",              # milestone bonuses at 256/512/1024/2048
+    reward_mode: str = "score_delta",          # match DQN — clean signal for SAC's entropy objective
     seed: int = 42,
-    lr: float = 2e-4,
-    gamma: float = 0.995,
+    lr: float = 1e-4,                         # stable LR for actor-critic
+    gamma: float = 0.99,                      # match DQN
     tau: float = 0.005,
-    buffer_size: int = 50_000,                # 300k OOMs (~6GB RAM for obs pairs); 50k ≈ 1GB
-    batch_size: int = 64,
-    learning_starts: int = 1_000,
-    n_envs: int = 1,
+    buffer_size: int = 200_000,               # bigger buffer for off-policy diversity
+    batch_size: int = 256,                    # larger batch for stable twin-Q updates
+    learning_starts: int = 10_000,            # collect diverse initial data
+    n_envs: int = 8,                          # parallel envs for speed
     device: str = "auto",
 ) -> DiscreteSACAgent:
     """
