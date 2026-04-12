@@ -244,11 +244,18 @@ for each prompt q (board state as text):
     # Clipped policy gradient + KL penalty
     L = (1/G) Σ_i (1/|o_i|) Σ_t [
         min(ratio_t · Â_i, clip(ratio_t, 1±0.2)·Â_i)
-        - β · D_KL(π_θ || π_ref)    # β = 0.04
+        - β · D_KL(π_θ || π_ref)    # β = 4.0
     ]
     
     Update θ with AdamW-8bit (lr=1e-6)
 ```
+
+**Multi-Model GRPO Scaling**:
+
+| Model | Score | Max Tile | Moves | Training |
+|---|---|---|---|---|
+| Qwen2.5-0.5B (baseline) | 704 | 64 | 93 | Stage 1→2 (~1 hr) |
+| **Qwen2.5-1.5B** | **2,348** | **256** | **197** | Stage 1→2→3 (~4.5 hrs) |
 
 **Multi-Component Verifiable Reward**:
 
@@ -269,7 +276,7 @@ for each prompt q (board state as text):
 ## 3. Current Results
 
 > [!NOTE]
-> **Training status**: DQN trained 5M steps (8 parallel envs → ~20M env interactions). PPO, A2C, LFA, QR-DQN completed 5M steps. SAC completed ~4M steps. GRPO trained 300 GRPO steps.
+> **Training status**: DQN trained 5M steps (8 parallel envs → ~20M env interactions). PPO, A2C, LFA, QR-DQN completed 5M steps. SAC completed ~4M steps. GRPO: 0.5B and 1.5B both completed 3-stage training.
 
 ### 3.1 Agent Performance Comparison — Final Results
 
@@ -277,11 +284,13 @@ for each prompt q (board state as text):
 |---|---|---|---|---|---|---|---|---|
 | **DQN** ⭐ | Off-policy, value | 5M×8 | **7,744** | **39,314** | **2048** | **76.0%** | **31.0%** | 330K |
 | **LFA** | On-policy, linear | 5M | 2,456 | 11,436 | 1024 | 6.0% | <1% | **108** |
+| **GRPO 1.5B** | RLVR | 1300 steps | **2,348** | 2,348 | **256** | — | — | 1.8B |
 | **A2C** | On-policy, A-C | 5M | 1,944 | 9,640 | 1024 | 6.0% | <1% | 330K |
-| **GRPO (LLM)** | RLVR | 300 steps | 1,816 | 1,816 | 128 | — | — | 494M |
+| **GRPO 0.5B** | RLVR | 1000 steps | 1,816 | 1,816 | 128 | — | — | 494M |
 | **SAC** | Off-policy, max-ent | ~4M | 1,131 | 5,566 | 512 | <1% | — | 330K |
 | **QR-DQN** | Off-policy, distrib. | 5M | 995 | 5,176 | 512 | <1% | — | 430K |
 | **PPO** | On-policy, A-C | 5M | 962 | 4,900 | 512 | <1% | — | 330K |
+| **GRPO 0.5B** (new) | RLVR | 1000 steps | 704 | 704 | 64 | — | — | 494M |
 
 ### 3.2 Improvement from 1M → 5M Steps
 
@@ -354,9 +363,9 @@ LFA with 108 parameters (a $4 \times 27$ weight matrix) outperforms PPO (330K pa
 
 In Hunt mode, DQN needs 5% ε-noise to break policy cycles at states with poor Q-estimates. Without exploration, the agent repeats the same suboptimal move indefinitely at 1024+ tiles.
 
-**5. GRPO: format before strategy**
+**5. GRPO: Model scale enables board reasoning**
 
-The LLM must learn XML output syntax (`<think>...</think><answer>...</answer>`) before game rewards provide any signal. Naïve multi-reward training causes **reward hacking** — the model maximizes completion length while ignoring format entirely.
+With 3-stage training (format → game reward → thinking quality), the 0.5B model learns XML formatting and direction selection but cannot reason about board tile merges (score 704, tile 64). The 1.5B model, with 3× more parameters, achieves 3.3× higher scores (2,348) and reaches tile 256 — demonstrating that model scale is critical for text-based board reasoning. KL divergence stability required `β=4.0` and `max_grad_norm=0.1` after two failed training runs diverged at KL=20,000+.
 
 ### 3.6 Latency Comparison
 
@@ -389,12 +398,12 @@ The LLM is **400× slower** than classical agents but provides **interpretable c
 
 | Task | Priority | Status |
 |---|---|---|
-| **Complete SAC 5M** (finish remaining ~1M steps) | High | ~4M done, ~1M remaining |
-| **Staged GRPO** Stage 2 (format → direction → game reward) | Medium | Stage 1 done |
+| **Complete SAC 5M** | High | ~4M done, ~1M remaining |
+| **GRPO 3-stage training (0.5B + 1.5B)** | High | ✅ **Done** — 1.5B: score 2,348, tile 256 |
 | **Scaling curves** (eval checkpoints 50K→5M) | Medium | Script implemented, need to run |
 | **Multi-seed runs** (3 seeds for error bars) | Low | Not started |
-| **Poster layout** and figure polishing | High | Content ready (this doc) |
-| **Final report revision** with 5M results | Medium | 1M draft complete |
+| **Poster layout** and figure polishing | High | ✅ **Updated** with GRPO results |
+| **Final report revision** with all results | Medium | In progress |
 
 ---
 

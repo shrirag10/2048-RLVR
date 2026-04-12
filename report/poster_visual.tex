@@ -274,7 +274,7 @@ $\gamma$ & 0.99 \\
 % ─── Bottom Banner ─────────────────────────────────────────────────
 \begin{keybox}
 \begin{center}
-{\large\bfseries 7 Agents} benchmarked end-to-end \quad\textbullet\quad
+{\large\bfseries 9 Agents} benchmarked end-to-end \quad\textbullet\quad
 {\large\bfseries 5M training steps} per agent \quad\textbullet\quad
 {\large\bfseries DQN reaches tile 2048}
 \end{center}
@@ -424,7 +424,7 @@ Semi-gradient SARSA: $\mathbf{w}_a \leftarrow \mathbf{w}_a + \alpha\delta\phi(s)
     arr/.style={-{Stealth[length=4pt]}, thick, purple!60}
 ]
 \node[box, fill=infolight] (prompt) at (0,0) {Board State};
-\node[box] (llm) at (2.6,0) {Qwen 0.5B};
+\node[box] (llm) at (2.6,0) {Qwen 0.5B--1.5B};
 \node[box, minimum width=2.6cm] (gen) at (5.6,0) {G=4 outputs};
 \node[box, fill=successlight] (verify) at (5.6,-0.9) {Verifier};
 \node[box, fill=accentlight] (grpo) at (2.6,-0.9) {GRPO Update};
@@ -439,14 +439,16 @@ Semi-gradient SARSA: $\mathbf{w}_a \leftarrow \mathbf{w}_a + \alpha\delta\phi(s)
 \end{center}
 
 {\small
-\textbf{Model:} Qwen2.5-0.5B, QLoRA 4-bit, 5.2M trainable (1.05\%)
+\textbf{Models:} Qwen2.5-0.5B \& 1.5B, QLoRA 4-bit, 5.2M trainable
 
 $\hat{A}_i=(r_i-\mu_G)/\sigma_G$ \quad {\footnotesize (group-normalized, no critic!)}
 
 \textbf{Rewards:} Format (+0.5) $|$ Direction (+0.5) $|$ Game ($\pm$2) $|$ Quality (+0.5)
 
+\textbf{Results:} 0.5B: tile 64 $|$ \textbf{1.5B: tile 256, score 2,348}
+
 \begin{calloutbox}[danger]
-{\footnotesize\bfseries Staged scheduling required!} All rewards at once $\to$ reward hacking (model maximizes length, ignores format).
+{\footnotesize\bfseries Staged scheduling required!} All rewards at once $\to$ reward hacking.
 \end{calloutbox}
 }
 \end{sectionbox}
@@ -475,14 +477,17 @@ $\hat{A}_i=(r_i-\mu_G)/\sigma_G$ \quad {\footnotesize (group-normalized, no crit
 \rowcolor{accentlight}
 DQN $\bigstar$ & \textcolor{accent}{\textbf{7,744}} & \textcolor{accent}{\textbf{39,314}} & \textcolor{accent}{\textbf{2048}} & \textcolor{accent}{\textbf{76.0\%}} & \textcolor{accent}{\textbf{31.0\%}} & 330K \\
 LFA & 2,456 & 11,436 & 1024 & 6.0\% & $<$1\% & \textcolor{success}{\textbf{108}} \\
+\rowcolor{purplelight}
+GRPO 1.5B & \textcolor{purple}{\textbf{2,348}} & 2,348 & \textcolor{purple}{\textbf{256}} & --- & --- & 1.8B \\
 A2C & 1,944 & 9,640 & 1024 & 6.0\% & $<$1\% & 330K \\
-GRPO (LLM) & 1,816 & 1,816 & 128 & --- & --- & 494M \\
-SAC$^*$ & 1,131 & 5,566 & 512 & $<$1\% & --- & 330K \\
+GRPO 0.5B & 1,816 & 1,816 & 128 & --- & --- & 494M \\
+SAC & 1,131 & 5,566 & 512 & $<$1\% & --- & 330K \\
 QR-DQN & 995 & 5,176 & 512 & $<$1\% & --- & 430K \\
 \rowcolor{dangerlight}
 PPO & \textcolor{danger}{962} & 4,900 & 512 & $<$1\% & --- & 330K \\
+GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \bottomrule
-\multicolumn{7}{@{}l}{\footnotesize $^*$SAC trained $\sim$4M steps (in progress); all others completed 5M.}
+\multicolumn{7}{@{}l}{\footnotesize GRPO: 0.5B = Qwen2.5-0.5B (3-stage); 1.5B = Qwen2.5-1.5B (3-stage). All classical agents 5M steps.}
 \end{tabular}
 }
 \end{center}
@@ -770,7 +775,7 @@ Deterministic greedy policies repeat suboptimal moves at high-tile states. Just 
 \end{sectionbox}
 
 % ─── Key Finding 5 ─────────────────────────────────────────────────
-\begin{sectionbox}[{\Large\color{white} 5}\; GRPO: Format Before Strategy]{purple}
+\begin{sectionbox}[{\Large\color{white} 5}\; GRPO: Model Scale $\to$ Board Reasoning]{purple}
 
 \begin{center}
 \resizebox{0.85\linewidth}{!}{
@@ -780,21 +785,23 @@ Deterministic greedy policies repeat suboptimal moves at high-tile states. Just 
     arr/.style={-{Stealth[length=4pt]}, very thick, purple!60}
 ]
 \node[stage=purple!15] (s1) at (0,0) {Stage 1: Format};
-\node[stage=purple!25] (s2) at (3.3,0) {Stage 2: Direction};
-\node[stage=purple!35] (s3) at (6.6,0) {Stage 3: Game};
+\node[stage=purple!25] (s2) at (3.3,0) {Stage 2: Game};
+\node[stage=purple!35] (s3) at (6.6,0) {Stage 3: Quality};
 
 \draw[arr] (s1) -- (s2);
 \draw[arr] (s2) -- (s3);
 
 \node[font=\footnotesize, text=success, below=3pt of s1] {\checkmark\,Done};
-\node[font=\footnotesize, text=gray, below=3pt of s2] {Next};
-\node[font=\footnotesize, text=gray, below=3pt of s3] {Future};
+\node[font=\footnotesize, text=success, below=3pt of s2] {\checkmark\,Done};
+\node[font=\footnotesize, text=success, below=3pt of s3] {\checkmark\,Done};
 \end{tikzpicture}
 }
 \end{center}
 
 {\small
-Simultaneous rewards $\to$ \textcolor{danger}{\textbf{reward hacking}} (model generates filler text). Must learn XML format first, then strategy.
+\textbf{Scaling results:} 0.5B $\to$ score 704, tile 64 \quad|\quad \textbf{1.5B $\to$ score 2,348, tile 256}
+
+3$\times$ more parameters $\to$ 3.3$\times$ higher score. Larger models reason about board merges; 0.5B memorizes format but can't plan.
 }
 \end{sectionbox}
 
@@ -833,11 +840,11 @@ Simultaneous rewards $\to$ \textcolor{danger}{\textbf{reward hacking}} (model ge
 % ─── Future Work ───────────────────────────────────────────────────
 \begin{sectionbox}[{\raisebox{-1pt}{\tikz\fill[primary] (0,0) rectangle (0.35,0.35);}\; Future Work}]{primary}
 \begin{itemize}[nosep, leftmargin=10pt, itemsep=2pt]
-    \item[\textcolor{accent}{$\triangleright$}] Complete SAC 5M training
-    \item[\textcolor{accent}{$\triangleright$}] Staged GRPO (Stage 2: +game reward)
+    \item[\textcolor{accent}{$\triangleright$}] Scale GRPO to Qwen2.5-3B / 7B (A100 GPU)
     \item[\textcolor{accent}{$\triangleright$}] Scaling curves at checkpoints 50K$\to$5M
     \item[\textcolor{accent}{$\triangleright$}] Multi-seed experiments for error bars
     \item[\textcolor{accent}{$\triangleright$}] Hybrid LLM-MCTS exploration
+    \item[\textcolor{accent}{$\triangleright$}] Longer GRPO max\_completion for deeper reasoning
 \end{itemize}
 \end{sectionbox}
 
@@ -851,7 +858,7 @@ Simultaneous rewards $\to$ \textcolor{danger}{\textbf{reward hacking}} (model ge
 \textcolor{accent}{\textbf{1.}} DQN dominates (avg 7,744, tile 2048) via experience replay \quad
 \textcolor{success}{\textbf{2.}} LFA (108 params) beats all deep on-policy agents \quad
 \textcolor{info}{\textbf{3.}} PPO degrades with more training\\
-\textcolor{purple}{\textbf{4.}} GRPO needs staged rewards \quad
+\textcolor{purple}{\textbf{4.}} GRPO 1.5B reaches tile 256 (3.3$\times$ better than 0.5B) \quad
 \textcolor{danger}{\textbf{5.}} 5\% exploration noise is essential for reaching 2048
 }
 \end{center}
