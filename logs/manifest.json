@@ -1,0 +1,222 @@
+{
+  "agents": [
+    {
+      "id": "dqn",
+      "name": "DQN",
+      "checkpoint": "logs/dqn/dqn_final.pt",
+      "replay": "logs/dqn/replays.json",
+      "replay_summary": {
+        "avg_score": 17204.0,
+        "max_score": 17204,
+        "max_tile_ever": 1024,
+        "avg_moves": 1005.0
+      },
+      "training": {
+        "n_episodes": 8483,
+        "avg_score": 2825.4,
+        "max_score": 18688.0,
+        "max_tile_ever": 1024,
+        "avg_moves": 235.7,
+        "reach_512": 0.1688,
+        "reach_1024": 0.012
+      },
+      "hunt_replay": "logs/dqn/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 21572.0,
+        "max_score": 21572,
+        "max_tile_ever": 2048,
+        "avg_moves": 1074.0
+      }
+    },
+    {
+      "id": "ppo",
+      "name": "PPO",
+      "checkpoint": "logs/ppo/ppo_final.zip",
+      "replay": "logs/ppo/replays.json",
+      "replay_summary": {
+        "avg_score": 6280.0,
+        "max_score": 6280,
+        "max_tile_ever": 512,
+        "avg_moves": 441.0
+      },
+      "training": {
+        "n_episodes": 7194,
+        "avg_score": 1099.3,
+        "max_score": 4536.0,
+        "max_tile_ever": 512,
+        "avg_moves": 141.1,
+        "reach_512": 0.0001,
+        "reach_1024": 0.0
+      },
+      "hunt_replay": "logs/ppo/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 5860.0,
+        "max_score": 5860,
+        "max_tile_ever": 512,
+        "avg_moves": 419.0
+      }
+    },
+    {
+      "id": "a2c",
+      "name": "A2C",
+      "checkpoint": "logs/a2c/a2c_final.zip",
+      "replay": "logs/a2c/replays.json",
+      "replay_summary": {
+        "avg_score": 7048.0,
+        "max_score": 7048,
+        "max_tile_ever": 512,
+        "avg_moves": 489.0
+      },
+      "training": {
+        "n_episodes": 5860,
+        "avg_score": 1243.7,
+        "max_score": 5308.0,
+        "max_tile_ever": 512,
+        "avg_moves": 170.3,
+        "reach_512": 0.0019,
+        "reach_1024": 0.0
+      },
+      "hunt_replay": "logs/a2c/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 7844.0,
+        "max_score": 7844,
+        "max_tile_ever": 512,
+        "avg_moves": 558.0
+      }
+    },
+    {
+      "id": "qrdqn",
+      "name": "QR-DQN",
+      "checkpoint": "logs/qrdqn/qrdqn_final.zip",
+      "replay": "logs/qrdqn/replays.json",
+      "replay_summary": {
+        "avg_score": 140.0,
+        "max_score": 140,
+        "max_tile_ever": 32,
+        "avg_moves": 2000.0
+      },
+      "training": {
+        "n_episodes": 1055,
+        "avg_score": 1089.6,
+        "max_score": 3404.0,
+        "max_tile_ever": 256,
+        "avg_moves": 143.3,
+        "reach_512": 0.0,
+        "reach_1024": 0.0
+      },
+      "hunt_replay": "logs/qrdqn/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 228.0,
+        "max_score": 228,
+        "max_tile_ever": 16,
+        "avg_moves": 3000.0
+      }
+    },
+    {
+      "id": "sac",
+      "name": "SAC",
+      "checkpoint": "logs/sac/sac_final.pt",
+      "replay": "logs/sac/replays.json",
+      "replay_summary": {
+        "avg_score": 2644.0,
+        "max_score": 2644,
+        "max_tile_ever": 256,
+        "avg_moves": 221.0
+      },
+      "training": {},
+      "hunt_replay": "logs/sac/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 3648.0,
+        "max_score": 3648,
+        "max_tile_ever": 256,
+        "avg_moves": 310.0
+      }
+    },
+    {
+      "id": "lfa",
+      "name": "LFA",
+      "checkpoint": "logs/lfa/lfa_final.npz",
+      "replay": "logs/lfa/replays.json",
+      "replay_summary": {
+        "avg_score": 7128.0,
+        "max_score": 7128,
+        "max_tile_ever": 512,
+        "avg_moves": 492.0
+      },
+      "training": {
+        "n_episodes": 9723,
+        "avg_score": 2298.9,
+        "max_score": 9804.0,
+        "max_tile_ever": 1024,
+        "avg_moves": 205.7,
+        "reach_512": 0.0441,
+        "reach_1024": 0.0001
+      },
+      "hunt_replay": "logs/lfa/hunt_replays.json",
+      "hunt_replay_summary": {
+        "avg_score": 12300.0,
+        "max_score": 12300,
+        "max_tile_ever": 1024,
+        "avg_moves": 734.0
+      }
+    },
+    {
+      "id": "grpo",
+      "name": "GRPO (Qwen2.5)",
+      "checkpoint": "logs/grpo/merged",
+      "replay": "logs/grpo/replays.json",
+      "replay_summary": {
+        "avg_score": 1816.0,
+        "max_score": 1816,
+        "max_tile_ever": 128,
+        "avg_moves": 186.0
+      },
+      "training": {
+        "n_episodes": 300,
+        "avg_score": 1816,
+        "max_score": 1816,
+        "max_tile_ever": 128,
+        "avg_moves": 186
+      }
+    },
+    {
+      "id": "grpo_0.5b",
+      "name": "GRPO (Qwen2.5-0.5B)",
+      "checkpoint": "logs/grpo_0.5b/adapter",
+      "replay": "logs/grpo_0.5b/replays.json",
+      "replay_summary": {
+        "avg_score": 704.0,
+        "max_score": 704,
+        "max_tile_ever": 64,
+        "avg_moves": 93.0
+      },
+      "training": {
+        "n_episodes": 1,
+        "avg_score": 704,
+        "max_score": 704,
+        "max_tile_ever": 64,
+        "avg_moves": 93
+      }
+    },
+    {
+      "id": "grpo_1.5b",
+      "name": "GRPO (Qwen2.5-1.5B)",
+      "checkpoint": "logs/grpo_1.5b/adapter",
+      "replay": "logs/grpo_1.5b/replays.json",
+      "replay_summary": {
+        "avg_score": 2348.0,
+        "max_score": 2348,
+        "max_tile_ever": 256,
+        "avg_moves": 197.0
+      },
+      "training": {
+        "n_episodes": 1,
+        "avg_score": 2348,
+        "max_score": 2348,
+        "max_tile_ever": 256,
+        "avg_moves": 197
+      }
+    }
+  ],
+  "generated": "2026-04-12T19:01:05"
+}
