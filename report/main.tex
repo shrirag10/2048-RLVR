@@ -224,7 +224,10 @@ The feature vector $\phi(s)$ follows Sutton and Barto's guidance on feature cons
 
 Updates follow the semi-gradient SARSA TD(0) rule (\S10.1, Eq.~10.1). The term ``semi-gradient'' (\S9.3) means we differentiate only through the prediction $\hat{q}(s_t,a_t)$, not the bootstrap target:
 \begin{equation}
-    \mathbf{w}_{a_t}\leftarrow\mathbf{w}_{a_t}+\alpha\delta_t\phi(s_t),\quad \delta_t=r_t+\gamma\hat{q}(s_{t+1},a_{t+1},\mathbf{w})-\hat{q}(s_t,a_t,\mathbf{w})
+\begin{split}
+    \mathbf{w}_{a_t}&\leftarrow\mathbf{w}_{a_t}+\alpha\delta_t\phi(s_t),\\
+    \delta_t &= r_t+\gamma\hat{q}(s_{t+1},a_{t+1},\mathbf{w})-\hat{q}(s_t,a_t,\mathbf{w})
+\end{split}
 \end{equation}
 with step-size $\alpha{=}5\times10^{-4}$ and $\gamma{=}0.99$. Exploration uses $\varepsilon$-greedy (\S2.2) with exponential decay factor 0.9999 per step. Under linear function approximation, semi-gradient SARSA converges to a TD fixed point with bounded approximation error (\S9.4, Theorem).
 
@@ -359,6 +362,7 @@ Table~\ref{tab:classical_results} presents the performance of all six classical 
 \centering
 \caption{Classical Agent Performance (Last 100 Episodes, 1M Steps, Shaped Reward)}
 \label{tab:classical_results}
+\resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 \textbf{Agent} & \textbf{Avg Score} & \textbf{Max Score} & \textbf{Max Tile} & \textbf{256+} & \textbf{512+} & \textbf{1024+} \\
@@ -371,6 +375,7 @@ PPO    & 1,038 & 3,040  & 256  & 7\%  & 0\%  & 0\% \\
 QR-DQN & 782   & 2,176  & 256  & 2\%  & 0\%  & 0\% \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \textbf{DQN dominance.} DQN substantially outperforms all other agents at 1M steps with shaped rewards, reaching 1024 tiles in 10\% of episodes and averaging 6,384 points. We attribute this to two factors: (i) experience replay (100K buffer) enables DQN to revisit high-scoring trajectories thousands of times, amplifying the learning signal from rare events such as 1024-tile merges; and (ii) the $\varepsilon$-greedy schedule provides structured exploration that gradually transitions from random play to learned strategy. On-policy methods discard each trajectory after a single policy update, making them far less sample-efficient in this sparse-reward setting.
@@ -448,6 +453,7 @@ Inference speed     & $\sim$1,500 ms/move \\
 \centering
 \caption{Cross-Method Comparison (1M Steps, Shaped Reward)}
 \label{tab:comparison}
+\resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}lcccccccc@{}}
 \toprule
 & \textbf{DQN} & \textbf{SARSA} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{SAC} & \textbf{LLM} \\
@@ -460,6 +466,7 @@ Parameters  & 330K  & 120   & 330K  & 330K  & 430K& 330K  & 494M \\
 Learning    & Off   & On    & On    & On    & Off & Off   & GRPO \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 The gap between the best classical agent (DQN, 6,384) and the LLM (1,816) is roughly $3.5\times$. However, this comparison should be contextualized: the LLM processed only 300$\times$4$=$1,200 effective game states during training with format-only rewards, while DQN processed 1M transitions with replay and shaped milestone bonuses. Moreover, the LLM must simultaneously learn (i) XML output syntax, (ii) spatial board parsing from text, and (iii) game strategy---three tasks that the classical agents never face because their observation encoding and output format are hardcoded.
