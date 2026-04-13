@@ -287,7 +287,7 @@ for each prompt q (board state as text):
 | **GRPO 1.5B** | RLVR | 1300 steps | **2,348** | 2,348 | **256** | — | — | 1.8B |
 | **A2C** | On-policy, A-C | 5M | 1,944 | 9,640 | 1024 | 6.0% | <1% | 330K |
 | **GRPO 0.5B** | RLVR | 1000 steps | 1,816 | 1,816 | 128 | — | — | 494M |
-| **SAC** | Off-policy, max-ent | ~4M | 1,131 | 5,566 | 512 | <1% | — | 330K |
+| **SAC** | Off-policy, max-ent | 5M | 1,255 | 7,882 | 512 | <1% | — | 330K |
 | **QR-DQN** | Off-policy, distrib. | 5M | 995 | 5,176 | 512 | <1% | — | 430K |
 | **PPO** | On-policy, A-C | 5M | 962 | 4,900 | 512 | <1% | — | 330K |
 | **GRPO 0.5B** (new) | RLVR | 1000 steps | 704 | 704 | 64 | — | — | 494M |
