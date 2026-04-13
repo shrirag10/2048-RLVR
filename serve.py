@@ -22,9 +22,13 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def log_message(self, fmt, *args):
-        # only log non-asset requests
-        if not any(args[0].endswith(ext) for ext in (".png", ".ico", ".css")):
-            super().log_message(fmt, *args)
+        # only log non-asset requests; guard against non-string args (e.g. HTTPStatus)
+        try:
+            if isinstance(args[0], str) and any(args[0].endswith(ext) for ext in (".png", ".ico", ".css")):
+                return
+        except (IndexError, AttributeError):
+            pass
+        super().log_message(fmt, *args)
 
 
 with socketserver.TCPServer(("", PORT), _Handler) as httpd:
