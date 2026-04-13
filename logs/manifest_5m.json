@@ -1,64 +1,50 @@
 {
   "agents": [
     {
-      "id": "dqn",
-      "name": "DQN",
+      "id": "dqn_5m",
+      "name": "DQN (5M)",
       "checkpoint": "logs/dqn_5m/dqn_final.pt",
       "replay": "logs/dqn_5m/replays.json",
       "replay_summary": {
-        "avg_score": 25320.0,
-        "max_score": 25320,
-        "max_tile_ever": 2048,
-        "avg_moves": 1336.0
+        "avg_score": 10336.0,
+        "max_score": 10336,
+        "max_tile_ever": 1024,
+        "avg_moves": 604.0
       },
       "training": {
-        "n_episodes": 8483,
-        "avg_score": 2825.4,
-        "max_score": 18688.0,
-        "max_tile_ever": 1024,
-        "avg_moves": 235.7,
-        "reach_512": 0.1688,
-        "reach_1024": 0.012
-      },
-      "hunt_replay": "logs/dqn_5m/hunt_replays.json",
-      "hunt_replay_summary": {
-        "avg_score": 21572.0,
-        "max_score": 21572,
+        "n_episodes": 48273,
+        "avg_score": 6099.8,
+        "max_score": 39314.0,
         "max_tile_ever": 2048,
-        "avg_moves": 1074.0
+        "avg_moves": 414.3,
+        "reach_512": 0.6,
+        "reach_1024": 0.1418
       }
     },
     {
-      "id": "ppo",
-      "name": "PPO",
+      "id": "ppo_5m",
+      "name": "PPO (5M)",
       "checkpoint": "logs/ppo_5m/ppo_final.zip",
       "replay": "logs/ppo_5m/replays.json",
       "replay_summary": {
-        "avg_score": 5312.0,
-        "max_score": 5312,
+        "avg_score": 5012.0,
+        "max_score": 5012,
         "max_tile_ever": 512,
-        "avg_moves": 365.0
+        "avg_moves": 339.0
       },
       "training": {
-        "n_episodes": 7194,
-        "avg_score": 1099.3,
-        "max_score": 4536.0,
+        "n_episodes": 42394,
+        "avg_score": 1088.6,
+        "max_score": 4900.0,
         "max_tile_ever": 512,
-        "avg_moves": 141.1,
+        "avg_moves": 118.0,
         "reach_512": 0.0001,
         "reach_1024": 0.0
-      },
-      "hunt_replay": "logs/ppo_5m/hunt_replays.json",
-      "hunt_replay_summary": {
-        "avg_score": 5860.0,
-        "max_score": 5860,
-        "max_tile_ever": 512,
-        "avg_moves": 419.0
       }
     },
     {
-      "id": "a2c",
-      "name": "A2C",
+      "id": "a2c_5m",
+      "name": "A2C (5M)",
       "checkpoint": "logs/a2c_5m/a2c_final.zip",
       "replay": "logs/a2c_5m/replays.json",
       "replay_summary": {
@@ -69,60 +55,75 @@
       },
       "training": {
         "n_episodes": 17023,
-        "avg_score": 1184.2,
-        "max_score": 5308.0,
-        "max_tile_ever": 512,
-        "avg_moves": 165.8,
-        "reach_512": 0.0015,
-        "reach_1024": 0.0
+        "avg_score": 1911.2,
+        "max_score": 9640.0,
+        "max_tile_ever": 1024,
+        "avg_moves": 293.7,
+        "reach_512": 0.0288,
+        "reach_1024": 0.0001
       }
     },
     {
-      "id": "qrdqn",
-      "name": "QR-DQN",
-      "checkpoint": null,
-      "training": {
-        "n_episodes": 1055,
-        "avg_score": 1089.6,
-        "max_score": 3404.0,
+      "id": "qrdqn_5m",
+      "name": "QR-DQN (5M)",
+      "checkpoint": "logs/qrdqn_5m/qrdqn_final.zip",
+      "replay": "logs/qrdqn_5m/replays.json",
+      "replay_summary": {
+        "avg_score": 2424.0,
+        "max_score": 2424,
         "max_tile_ever": 256,
-        "avg_moves": 143.3,
-        "reach_512": 0.0,
+        "avg_moves": 211.0
+      },
+      "training": {
+        "n_episodes": 18976,
+        "avg_score": 1001.9,
+        "max_score": 4508.0,
+        "max_tile_ever": 512,
+        "avg_moves": 263.4,
+        "reach_512": 0.0001,
         "reach_1024": 0.0
       }
     },
     {
-      "id": "sac",
-      "name": "SAC",
-      "checkpoint": null,
-      "training": {}
+      "id": "sac_5m",
+      "name": "SAC (5M)",
+      "checkpoint": "logs/sac_5m/sac_final.pt",
+      "replay": "logs/sac_5m/replays.json",
+      "replay_summary": {
+        "avg_score": 2708.0,
+        "max_score": 2708,
+        "max_tile_ever": 256,
+        "avg_moves": 231.0
+      },
+      "training": {
+        "n_episodes": 149440,
+        "avg_score": 1256.4,
+        "max_score": 7882.0,
+        "max_tile_ever": 512,
+        "avg_moves": 133.8,
+        "reach_512": 0.001,
+        "reach_1024": 0.0
+      }
     },
     {
-      "id": "lfa",
-      "name": "LFA",
+      "id": "lfa_5m",
+      "name": "LFA (5M)",
       "checkpoint": "logs/lfa_5m/lfa_final.npz",
       "replay": "logs/lfa_5m/replays.json",
       "replay_summary": {
-        "avg_score": 7620.0,
-        "max_score": 7620,
+        "avg_score": 7536.0,
+        "max_score": 7536,
         "max_tile_ever": 512,
-        "avg_moves": 538.0
+        "avg_moves": 529.0
       },
       "training": {
-        "n_episodes": 9723,
-        "avg_score": 2298.9,
-        "max_score": 9804.0,
+        "n_episodes": 24679,
+        "avg_score": 2259.1,
+        "max_score": 11436.0,
         "max_tile_ever": 1024,
-        "avg_moves": 205.7,
-        "reach_512": 0.0441,
-        "reach_1024": 0.0001
-      },
-      "hunt_replay": "logs/lfa_5m/hunt_replays.json",
-      "hunt_replay_summary": {
-        "avg_score": 12300.0,
-        "max_score": 12300,
-        "max_tile_ever": 1024,
-        "avg_moves": 734.0
+        "avg_moves": 202.6,
+        "reach_512": 0.0413,
+        "reach_1024": 0.0002
       }
     },
     {
@@ -141,12 +142,47 @@
         "avg_score": 1816,
         "max_score": 1816,
         "max_tile_ever": 128,
-        "avg_moves": 186,
-        "reach_512": 0.0,
-        "reach_1024": 0.0
+        "avg_moves": 186
+      }
+    },
+    {
+      "id": "grpo_0.5b",
+      "name": "GRPO (Qwen2.5-0.5B)",
+      "checkpoint": "logs/grpo_0.5b/adapter",
+      "replay": "logs/grpo_0.5b/replays.json",
+      "replay_summary": {
+        "avg_score": 704.0,
+        "max_score": 704,
+        "max_tile_ever": 64,
+        "avg_moves": 93.0
+      },
+      "training": {
+        "n_episodes": 1,
+        "avg_score": 704,
+        "max_score": 704,
+        "max_tile_ever": 64,
+        "avg_moves": 93
+      }
+    },
+    {
+      "id": "grpo_1.5b",
+      "name": "GRPO (Qwen2.5-1.5B)",
+      "checkpoint": "logs/grpo_1.5b/adapter",
+      "replay": "logs/grpo_1.5b/replays.json",
+      "replay_summary": {
+        "avg_score": 2348.0,
+        "max_score": 2348,
+        "max_tile_ever": 256,
+        "avg_moves": 197.0
+      },
+      "training": {
+        "n_episodes": 1,
+        "avg_score": 2348,
+        "max_score": 2348,
+        "max_tile_ever": 256,
+        "avg_moves": 197
       }
     }
   ],
-  "generated": "2026-04-02T16:14:00",
-  "mode": "5m"
+  "generated": "2026-04-13T16:30:34"
 }

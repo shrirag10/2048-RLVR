@@ -523,9 +523,9 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \node[font=\tiny, anchor=south, text=info] at (3.975, 0.78) {1944};
 % SAC
 \fill[danger!30] (5.35,0) rectangle (5.7, 0.263); \draw[danger!60] (5.35,0) rectangle (5.7, 0.263);
-\fill[danger!70] (5.7,0) rectangle (6.05, 0.424); \draw[danger] (5.7,0) rectangle (6.05, 0.424);
+\fill[danger!70] (5.7,0) rectangle (6.05, 0.471); \draw[danger] (5.7,0) rectangle (6.05, 0.471);
 \node[font=\tiny\bfseries, anchor=north, text=danger] at (5.7, -0.15) {SAC};
-\node[font=\tiny, anchor=south, text=danger] at (5.875, 0.47) {1131};
+\node[font=\tiny, anchor=south, text=danger] at (5.875, 0.52) {1255};
 % QR-DQN
 \fill[purple!30] (7.25,0) rectangle (7.6, 0.409); \draw[purple!60] (7.25,0) rectangle (7.6, 0.409);
 \fill[purple!70] (7.6,0) rectangle (7.95, 0.373); \draw[purple] (7.6,0) rectangle (7.95, 0.373);
@@ -566,7 +566,7 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 % Tile progression visualization
 \foreach \i/\tile/\agent/\col in {
     0/2048/DQN/accent, 1/1024/LFA/success, 2/512/A2C/info,
-    3/512/PPO/info, 4/256/SAC/danger, 5/16/QR-DQN/purple}{
+    3/512/PPO/info, 4/512/QR-DQN/purple, 5/256/SAC/danger}{
     \pgfmathsetmacro{\w}{3.5 * ln(\tile+1) / ln(2049)}
     \fill[\col!60, rounded corners=2pt] (0, -\i*0.65) rectangle (\w*2.9, -\i*0.65+0.5);
     \node[font=\tiny\bfseries, anchor=west, text=white] at (0.1, -\i*0.65+0.25) {\agent};

@@ -276,7 +276,7 @@ for each prompt q (board state as text):
 ## 3. Current Results
 
 > [!NOTE]
-> **Training status**: DQN trained 5M steps (8 parallel envs → ~20M env interactions). PPO, A2C, LFA, QR-DQN completed 5M steps. SAC completed ~4M steps. GRPO: 0.5B and 1.5B both completed 3-stage training.
+> **Training status**: All 6 classical agents completed 5M training steps. GRPO: 0.5B and 1.5B both completed 3-stage training.
 
 ### 3.1 Agent Performance Comparison — Final Results
 
@@ -301,7 +301,7 @@ for each prompt q (board state as text):
 | **LFA** | 2,299 | 2,456 | +7% | Plateaued (linear capacity ceiling) |
 | **QR-DQN** | 1,090 | 995 | **−9%** 📉 | Still degrading (invalid-move loops) |
 | **PPO** | 1,099 | 962 | **−12%** 📉 | Worse with more training! |
-| **SAC** | ~700 | 1,131 | +62% | Slow but improving |
+| **SAC** | ~700 | 1,255 | +79% | Slow but improving |
 
 > [!IMPORTANT]
 > **Key insight from scaling**: Only **DQN** shows strong continued improvement with 5× more training. On-policy methods (PPO) actually *degrade*. A2C improves modestly. QR-DQN's invalid-move loops worsen. This confirms **off-policy replay is essential** for 2048's sparse reward structure.
@@ -314,8 +314,8 @@ for each prompt q (board state as text):
 | LFA | 1024 | 12,300 | 95% greedy |
 | A2C | 512 | 7,844 | Distribution sampling |
 | PPO | 512 | 5,860 | Distribution sampling |
+| QR-DQN | 512 | 5,916 | ε=0.05 (quantile_net fix) |
 | SAC | 256 | 3,648 | Probability sampling |
-| QR-DQN | 16 | 228 | ε=0.05 |
 
 ### 3.4 Learning Curves
 
@@ -379,6 +379,50 @@ With 3-stage training (format → game reward → thinking quality), the 0.5B mo
 
 The LLM is **400× slower** than classical agents but provides **interpretable chain-of-thought reasoning**.
 
+### 3.7 Classical RL vs. GRPO (LLM-RLVR) — Comprehensive Comparison
+
+| Dimension | Classical RL (DQN best) | GRPO (LLM-RLVR) |
+|---|---|---|
+| **Best Score** | **7,744** avg (DQN 5M) | 2,348 (Qwen2.5-1.5B) |
+| **Max Tile** | **2048** (DQN hunt) | 256 (1.5B) |
+| **Parameters** | 330K (CNN) | 494M–1.8B (LLM) |
+| **Training data** | 5M env steps (~20M interactions) | 1,300 GRPO steps |
+| **Training time** | ~8 hrs (DQN 5M, RTX 4060) | ~4.5 hrs (1.5B 3-stage) |
+| **Inference** | 3.6 ms/move | 1,500 ms/move (400× slower) |
+| **Observation** | 16-ch binary tensor (4×4) | Text board representation |
+| **Action selection** | Q-value argmax + ε-greedy | XML generation + parsing |
+| **Interpretability** | Black box (Q-values only) | **Chain-of-thought reasoning** |
+| **Scalability** | +174% (1M→5M steps) | +233% (0.5B→1.5B model) |
+
+#### Why Classical RL Dominates
+
+1. **State representation**: The 16-channel binary tensor encodes the board state losslessly in 256 floats. The LLM must encode the same board as text ("Row 0: 2, 4, 0, 8"), losing spatial relationships that CNNs exploit via 2D convolutions.
+
+2. **Experience replay**: DQN's 100K-sample buffer lets it revisit rare high-scoring trajectories thousands of times. GRPO generates only G=4 completions per prompt — each board state is seen at most once.
+
+3. **Action space efficiency**: Classical agents output 4 Q-values in one forward pass. The LLM generates 50–128 tokens to select the same 4 actions, spending most capacity on syntax rather than decision-making.
+
+4. **Training signal density**: Classical RL gets reward feedback at every step (merge score, milestone bonuses). GRPO gets reward only after the full generation is complete — a single scalar for 100+ tokens.
+
+#### Why GRPO Still Matters
+
+1. **Zero-shot transfer**: The LLM starts with language understanding — it can parse board descriptions, reason about tile positions, and generate explanations without any environment-specific architecture.
+
+2. **Interpretability**: GRPO produces `<think>The corner has 256, I should merge down...</think>` — human-readable reasoning that classical agents cannot provide.
+
+3. **Model scaling works**: 0.5B → 1.5B (3× params) yielded 3.3× score improvement (704 → 2,348). Extrapolating, a 7B model on an A100 could potentially match LFA-level performance while maintaining interpretability.
+
+4. **Staged reward scheduling**: The key GRPO insight is that simultaneous rewards cause reward hacking. Training must follow: format → game reward → thinking quality. This mirrors curriculum learning in classical RL.
+
+#### GRPO Training Stability Lessons
+
+| Issue | Symptom | Fix |
+|---|---|---|
+| KL divergence explosion | KL > 20,000, loss >1000 | β=4.0 (was 0.04), max_grad_norm=0.1 |
+| Reward hacking | Model generates filler text | Staged reward scheduling |
+| Adapter weight freeze | No learning on resume | `FastLanguageModel.for_training(model)` |
+| Token truncation | 1.5B hits 128-token limit | Increase max_completion_length to 256 |
+
 ---
 
 ## 4. Plan to Finish
@@ -387,8 +431,8 @@ The LLM is **400× slower** than classical agents but provides **interpretable c
 - [x] Custom 2048 Gymnasium environment with 3 reward modes + action masking
 - [x] 16-channel binary observation encoding + shared CNN backbone
 - [x] 7 agents trained and benchmarked (DQN, PPO, A2C, QR-DQN, SAC, LFA, GRPO)
-- [x] 5M-step training completed for DQN, PPO, A2C, QR-DQN, LFA
-- [x] ~4M-step training for SAC (in progress)
+- [x] 5M-step training completed for all 6 classical agents
+- [x] GRPO multi-agent: 0.5B (tile 64) + 1.5B (tile 256)
 - [x] Hunt-2048 mode — DQN reaches 2048 ✓
 - [x] Interactive web dashboard with 3 views (Play, Benchmark, Agent Playback)
 - [x] LaTeX research report (IEEE format)
@@ -398,12 +442,12 @@ The LLM is **400× slower** than classical agents but provides **interpretable c
 
 | Task | Priority | Status |
 |---|---|---|
-| **Complete SAC 5M** | High | ~4M done, ~1M remaining |
+| **Complete SAC 5M** | High | ✅ **Done** — avg 1,255, max 7,882, tile 512 |
 | **GRPO 3-stage training (0.5B + 1.5B)** | High | ✅ **Done** — 1.5B: score 2,348, tile 256 |
 | **Scaling curves** (eval checkpoints 50K→5M) | Medium | Script implemented, need to run |
 | **Multi-seed runs** (3 seeds for error bars) | Low | Not started |
 | **Poster layout** and figure polishing | High | ✅ **Updated** with GRPO results |
-| **Final report revision** with all results | Medium | In progress |
+| **Final report revision** with all results | Medium | ✅ **Done** — Classical vs GRPO comparison added |
 
 ---
 
