@@ -128,7 +128,7 @@
     {\fontsize{22}{26}\selectfont\bfseries Solving 2048: Classical RL vs.\ LLM-Guided RLVR}
 };
 \node[anchor=center, text=white!85] at (0.5\textwidth, 1.05cm) {
-    {\large CS 5180 --- Reinforcement Learning \quad|\quad Northeastern University}
+    {\large CS 5180: Reinforcement Learning \quad|\quad Northeastern University}
 };
 \node[anchor=center, text=accent] at (0.5\textwidth, 0.4cm) {
     {\normalsize\bfseries Shriman Raghav \quad\&\quad Gautham Ramkumar \quad|\quad MS Robotics}
@@ -175,10 +175,10 @@
 % ─── Why It's Hard ─────────────────────────────────────────────────
 \begin{sectionbox}[{\raisebox{-1pt}{\tikz\fill[danger] (0,0) rectangle (0.35,0.35);}\; Why 2048 Is Hard for RL}]{danger}
 \begin{itemize}[nosep, leftmargin=12pt, itemsep=3pt]
-    \item[\textcolor{danger}{\textbullet}] \textbf{Sparse rewards} --- hundreds of low-value merges before one big payoff
-    \item[\textcolor{danger}{\textbullet}] \textbf{Stochastic dynamics} --- random tile spawns prevent deterministic planning
-    \item[\textcolor{danger}{\textbullet}] \textbf{Huge state space} --- $\sim\!17^{16} \approx 2.8 \times 10^{19}$ configurations
-    \item[\textcolor{danger}{\textbullet}] \textbf{Long horizons} --- episodes last 100--1000+ steps
+    \item[\textcolor{danger}{\textbullet}] \textbf{Sparse rewards}: hundreds of low-value merges before one big payoff
+    \item[\textcolor{danger}{\textbullet}] \textbf{Stochastic dynamics}: random tile spawns prevent deterministic planning
+    \item[\textcolor{danger}{\textbullet}] \textbf{Huge state space}: $\sim\!17^{16} \approx 2.8 \times 10^{19}$ configurations
+    \item[\textcolor{danger}{\textbullet}] \textbf{Long horizons}: episodes last 100--1000+ steps
 \end{itemize}
 \end{sectionbox}
 
@@ -215,7 +215,7 @@
 {\small
 \begin{tabularx}{\linewidth}{@{}>{\bfseries\color{info}}l X@{}}
 $\mathcal{S}$ & $4{\times}4$ board $\to$ 16-channel binary tensor $\mathbf{x} \in \{0,1\}^{16 \times 4 \times 4}$ \\
-$\mathcal{A}$ & \{UP, RIGHT, DOWN, LEFT\} --- 4 discrete actions \\
+$\mathcal{A}$ & \{UP, RIGHT, DOWN, LEFT\}: 4 discrete actions \\
 $\mathcal{T}$ & Slide-merge (deterministic) $\oplus$ random tile spawn (stochastic: 2 w/ $p{=}0.9$, 4 w/ $p{=}0.1$) \\
 $\mathcal{R}$ & Merge score delta + milestone bonuses (+50@256, +100@512, +200@1024) \\
 $\gamma$ & 0.99 \\
@@ -266,7 +266,7 @@ $\gamma$ & 0.99 \\
 \end{center}
 
 \vspace{-2pt}
-{\small $x_{k,i,j}=\mathbb{1}[B_{i,j}=2^k]$ --- one-hot power-of-2 avoids magnitude bias in CNN filters.}
+{\small $x_{k,i,j}=\mathbb{1}[B_{i,j}=2^k]$: one-hot power-of-2 avoids magnitude bias in CNN filters.}
 \end{sectionbox}
 
 \end{multicols}
@@ -286,7 +286,7 @@ $\gamma$ & 0.99 \\
 \newpage
 \pageheader
 
-\pagetitle{Algorithms \& Architecture}{Shared CNN backbone isolates the learning algorithm --- not the architecture}
+\pagetitle{Algorithms \& Architecture}{Shared CNN backbone isolates the learning algorithm: not the architecture}
 
 \begin{multicols}{2}
 
@@ -478,14 +478,14 @@ $\hat{A}_i=(r_i-\mu_G)/\sigma_G$ \quad {\footnotesize (group-normalized, no crit
 DQN $\bigstar$ & \textcolor{accent}{\textbf{7,744}} & \textcolor{accent}{\textbf{39,314}} & \textcolor{accent}{\textbf{2048}} & \textcolor{accent}{\textbf{76.0\%}} & \textcolor{accent}{\textbf{31.0\%}} & 330K \\
 Semi-grad.\ SARSA & 2,456 & 11,436 & 1024 & 6.0\% & $<$1\% & \textcolor{success}{\textbf{120}} \\
 \rowcolor{purplelight}
-GRPO 1.5B & \textcolor{purple}{\textbf{2,348}} & 2,348 & \textcolor{purple}{\textbf{256}} & --- & --- & 1.8B \\
+GRPO 1.5B & \textcolor{purple}{\textbf{2,348}} & 2,348 & \textcolor{purple}{\textbf{256}} &: &: & 1.8B \\
 A2C & 1,944 & 9,640 & 1024 & 6.0\% & $<$1\% & 330K \\
-GRPO 0.5B & 1,816 & 1,816 & 128 & --- & --- & 494M \\
-SAC & 1,255 & 7,882 & 512 & $<$1\% & --- & 330K \\
-QR-DQN & 995 & 5,176 & 512 & $<$1\% & --- & 430K \\
+GRPO 0.5B & 1,816 & 1,816 & 128 &: &: & 494M \\
+SAC & 1,255 & 7,882 & 512 & $<$1\% &: & 330K \\
+QR-DQN & 995 & 5,176 & 512 & $<$1\% &: & 430K \\
 \rowcolor{dangerlight}
-PPO & \textcolor{danger}{962} & 4,900 & 512 & $<$1\% & --- & 330K \\
-GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
+PPO & \textcolor{danger}{962} & 4,900 & 512 & $<$1\% &: & 330K \\
+GRPO 0.5B & 704 & 704 & 64 &: &: & 494M \\
 \bottomrule
 \multicolumn{7}{@{}l}{\footnotesize GRPO: 0.5B = Qwen2.5-0.5B (3-stage); 1.5B = Qwen2.5-1.5B (3-stage). Semi-gradient SARSA = S\&B Alg.\ 10.1.}
 \end{tabular}
