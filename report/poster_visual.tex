@@ -396,20 +396,20 @@ Twin Q-nets, auto-tuned temperature $\alpha$, Polyak $\tau{=}0.005$.
 }
 \end{sectionbox}
 
-% ─── LFA ───────────────────────────────────────────────────────────
-\begin{sectionbox}[{\raisebox{-1pt}{\tikz\fill[success] (0,0) rectangle (0.35,0.35);}\; \agentname{LFA} $|$ Only 108 Parameters!}]{success}
+% ─── Semi-gradient SARSA ───────────────────────────────────────────
+\begin{sectionbox}[{\raisebox{-1pt}{\tikz\fill[success] (0,0) rectangle (0.35,0.35);}\; \agentname{Semi-gradient SARSA} $|$ Only 120 Parameters!}]{success}
 
 \begin{calloutbox}[success]
-{\bfseries\small Surprise: 108 params beats 330K--494M deep nets!}
+{\bfseries\small Sutton \& Barto Algorithm 10.1: 120 params beats 330K--494M deep nets!}
 \end{calloutbox}
 
 \vspace{2pt}
 {\small
-$\hat{q}(s,a)=\mathbf{w}_a^\top\phi(s)$, \quad $\mathbf{w}\in\mathbb{R}^{4\times 27}$
+$\hat{q}(s,a,\mathbf{w})=\mathbf{w}_a^\top\phi(s)$, \quad $\mathbf{w}\in\mathbb{R}^{4\times 30}$
 
-\textbf{27-dim features:} log-tile values, empty ratio, merge potential, 4 monotonicity scores, corner bonus, tile distribution stats.
+\textbf{30-dim features (\S9.5):} log-tile values, empty ratio, merge potential, 4 monotonicity scores, corner bonus, smoothness, snake pattern, edge sum.
 
-Semi-gradient SARSA: $\mathbf{w}_a \leftarrow \mathbf{w}_a + \alpha\delta\phi(s)$
+Semi-gradient SARSA (\S10.1): $\mathbf{w}_a \leftarrow \mathbf{w}_a + \alpha\delta\phi(s)$, \quad $\delta = R + \gamma\hat{q}(S',A') - \hat{q}(S,A)$
 }
 \end{sectionbox}
 
@@ -476,7 +476,7 @@ $\hat{A}_i=(r_i-\mu_G)/\sigma_G$ \quad {\footnotesize (group-normalized, no crit
 \midrule
 \rowcolor{accentlight}
 DQN $\bigstar$ & \textcolor{accent}{\textbf{7,744}} & \textcolor{accent}{\textbf{39,314}} & \textcolor{accent}{\textbf{2048}} & \textcolor{accent}{\textbf{76.0\%}} & \textcolor{accent}{\textbf{31.0\%}} & 330K \\
-LFA & 2,456 & 11,436 & 1024 & 6.0\% & $<$1\% & \textcolor{success}{\textbf{108}} \\
+Semi-grad.\ SARSA & 2,456 & 11,436 & 1024 & 6.0\% & $<$1\% & \textcolor{success}{\textbf{120}} \\
 \rowcolor{purplelight}
 GRPO 1.5B & \textcolor{purple}{\textbf{2,348}} & 2,348 & \textcolor{purple}{\textbf{256}} & --- & --- & 1.8B \\
 A2C & 1,944 & 9,640 & 1024 & 6.0\% & $<$1\% & 330K \\
@@ -487,7 +487,7 @@ QR-DQN & 995 & 5,176 & 512 & $<$1\% & --- & 430K \\
 PPO & \textcolor{danger}{962} & 4,900 & 512 & $<$1\% & --- & 330K \\
 GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \bottomrule
-\multicolumn{7}{@{}l}{\footnotesize GRPO: 0.5B = Qwen2.5-0.5B (3-stage); 1.5B = Qwen2.5-1.5B (3-stage). All agents completed 5M steps.}
+\multicolumn{7}{@{}l}{\footnotesize GRPO: 0.5B = Qwen2.5-0.5B (3-stage); 1.5B = Qwen2.5-1.5B (3-stage). Semi-gradient SARSA = S\&B Alg.\ 10.1.}
 \end{tabular}
 }
 \end{center}
@@ -514,7 +514,7 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 % LFA
 \fill[success!30] (1.55,0) rectangle (1.9, 0.862); \draw[success!60] (1.55,0) rectangle (1.9, 0.862);
 \fill[success!70] (1.9,0) rectangle (2.25, 0.921); \draw[success] (1.9,0) rectangle (2.25, 0.921);
-\node[font=\tiny\bfseries, anchor=north, text=success] at (1.9, -0.15) {LFA};
+\node[font=\tiny\bfseries, anchor=north, text=success] at (1.9, -0.15) {SARSA};
 \node[font=\tiny, anchor=south, text=success] at (2.075, 0.97) {2456};
 % A2C
 \fill[info!30] (3.45,0) rectangle (3.8, 0.467); \draw[info!60] (3.45,0) rectangle (3.8, 0.467);
@@ -565,7 +565,7 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \begin{tikzpicture}
 % Tile progression visualization
 \foreach \i/\tile/\agent/\col in {
-    0/2048/DQN/accent, 1/1024/LFA/success, 2/512/A2C/info,
+    0/2048/DQN/accent, 1/1024/SARSA/success, 2/512/A2C/info,
     3/512/PPO/info, 4/512/QR-DQN/purple, 5/256/SAC/danger}{
     \pgfmathsetmacro{\w}{3.5 * ln(\tile+1) / ln(2049)}
     \fill[\col!60, rounded corners=2pt] (0, -\i*0.65) rectangle (\w*2.9, -\i*0.65+0.5);
@@ -601,7 +601,7 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \begin{minipage}[t]{0.16\linewidth}
 \centering
 \includegraphics[width=\linewidth]{fig_lfa_5m.png}\\[-3pt]
-{\tiny\bfseries\color{success} LFA $|$ 2,456}
+{\tiny\bfseries\color{success} SARSA $|$ 2,456}
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.16\linewidth}
@@ -679,9 +679,9 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \node[font=\footnotesize\bfseries] at (8.0, 0.52) {A2C};
 \node[font=\footnotesize, text=gray] at (8.0, -0.15) {1944};
 
-% LFA bar
+% Semi-gradient SARSA bar
 \fill[success!40, rounded corners=2pt] (8.9, 0) rectangle (9.7, 0.48);
-\node[font=\footnotesize\bfseries] at (9.3, 0.62) {LFA};
+\node[font=\footnotesize\bfseries] at (9.3, 0.62) {SARSA};
 \node[font=\footnotesize, text=gray] at (9.3, -0.15) {2456};
 
 \draw[thick, gray!40] (-0.3, 0) -- (10.8, 0);
@@ -690,12 +690,12 @@ GRPO 0.5B & 704 & 704 & 64 & --- & --- & 494M \\
 \end{center}
 
 {\small
-DQN's \textbf{experience replay} (100K buffer) revisits rare high-scoring trajectories thousands of times. On-policy methods discard each trajectory after one update, which is catastrophic for sparse rewards.
+DQN's \textbf{experience replay} (100K buffer, S\&B \S8.2) revisits rare high-scoring trajectories thousands of times. On-policy methods (\S5.4) discard each trajectory after one update, catastrophic for sparse rewards.
 }
 \end{sectionbox}
 
 % ─── Key Finding 2 ─────────────────────────────────────────────────
-\begin{sectionbox}[{\Large\color{white} 2}\; Feature Engineering vs.\ Deep Learning]{success}
+\begin{sectionbox}[{\Large\color{white} 2}\; Feature Engineering vs.\ Deep Learning (S\&B \S9.5)]{success}
 
 \begin{center}
 \resizebox{0.85\linewidth}{!}{
@@ -703,13 +703,13 @@ DQN's \textbf{experience replay} (100K buffer) revisits rare high-scoring trajec
 % Parameter efficiency visual
 \node[draw=success, fill=success!10, rounded corners=4pt, 
       minimum width=3cm, minimum height=0.7cm, font=\normalsize\bfseries] 
-      (lfa) at (0,0) {LFA: 108 params};
+      (lfa) at (0,0) {SARSA: 120 params};
 \node[draw=primary, fill=primary!10, rounded corners=4pt,
       minimum width=6cm, minimum height=0.7cm, font=\normalsize\bfseries]
       (deep) at (4.8,0) {Deep Agents: 330K--494M params};
 
 \node[font=\normalsize\bfseries, text=success] at (0, -0.7) {Avg: 2,456};
-\node[font=\normalsize, text=danger] at (4.8, -0.7) {PPO: 962 \quad QR: 995 \quad SAC: 1,131};
+\node[font=\normalsize, text=danger] at (4.8, -0.7) {PPO: 962 \quad QR: 995 \quad SAC: 1,255};
 
 \draw[ultra thick, success, -{Stealth}] (0, -1.1) -- (0, -1.5)
     node[below, font=\footnotesize\bfseries, text=success] {WINS};
@@ -718,7 +718,7 @@ DQN's \textbf{experience replay} (100K buffer) revisits rare high-scoring trajec
 \end{center}
 
 {\small
-Hand-crafted monotonicity \& corner features provide stronger inductive bias than CNNs learning from scratch. \textbf{4000$\times$ parameter efficiency!} But LFA plateaus at ${\sim}2500$ (linear capacity ceiling).
+Hand-crafted monotonicity \& corner features (Sutton \& Barto \S9.5) provide stronger inductive bias than CNNs learning from scratch. \textbf{2750$\times$ parameter efficiency!} But Semi-gradient SARSA plateaus at ${\sim}2500$ (linear capacity ceiling, \S9.4).
 }
 \end{sectionbox}
 
@@ -732,8 +732,8 @@ Hand-crafted monotonicity \& corner features provide stronger inductive bias tha
 \textbf{Pattern} & \textbf{$\Delta$} & \textbf{Agents} \\
 \midrule
 \textcolor{accent}{\textbf{$\uparrow$ Strong}} & \textcolor{accent}{\textbf{+174\%}} & DQN \\
-\textcolor{info}{$\uparrow$ Modest} & +56--62\% & A2C, SAC \\
-\textcolor{gray}{$\rightarrow$ Plateau} & +7\% & LFA \\
+\textcolor{info}{$\uparrow$ Modest} & +56--79\% & A2C, SAC \\
+\textcolor{gray}{$\rightarrow$ Plateau} & +7\% & Semi-grad.\ SARSA \\
 \textcolor{danger}{\textbf{$\downarrow$ Degrade}} & \textcolor{danger}{\textbf{$-$9--12\%}} & PPO, QR-DQN \\
 \bottomrule
 \end{tabular}
@@ -812,7 +812,7 @@ Deterministic greedy policies repeat suboptimal moves at high-tile states. Just 
 \begin{tikzpicture}
 % Latency bars - manual
 \fill[success!50, rounded corners=2pt] (0,0) rectangle (0.15,0.4);
-\node[font=\footnotesize\bfseries, anchor=west, text=success] at (0.1,0.2) {LFA};
+\node[font=\footnotesize\bfseries, anchor=west, text=success] at (0.1,0.2) {SARSA};
 \node[font=\footnotesize\bfseries, anchor=west] at (0.3,0.2) {$<$0.1ms};
 %
 \fill[info!50, rounded corners=2pt] (0,-0.6) rectangle (0.3,-0.2);
@@ -856,7 +856,7 @@ Deterministic greedy policies repeat suboptimal moves at high-tile states. Just 
 {\large\bfseries Key Takeaways}\\[4pt]
 {\small
 \textcolor{accent}{\textbf{1.}} DQN dominates (avg 7,744, tile 2048) via experience replay \quad
-\textcolor{success}{\textbf{2.}} LFA (108 params) beats all deep on-policy agents \quad
+\textcolor{success}{\textbf{2.}} Semi-gradient SARSA (120 params, S\&B Alg.\ 10.1) beats all deep on-policy agents \quad
 \textcolor{info}{\textbf{3.}} PPO degrades with more training\\
 \textcolor{purple}{\textbf{4.}} GRPO 1.5B reaches tile 256 (3.3$\times$ better than 0.5B) \quad
 \textcolor{danger}{\textbf{5.}} 5\% exploration noise is essential for reaching 2048
