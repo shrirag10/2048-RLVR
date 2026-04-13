@@ -137,7 +137,9 @@ def _sb3_episode(model, env: Gym2048Env, algo: str) -> tuple[list[dict], dict]:
             obs_t = torch.FloatTensor(obs).unsqueeze(0).to(model.device)
             with torch.no_grad():
                 if algo == "qrdqn":
-                    q = model.policy.q_net(obs_t).mean(dim=1).squeeze().cpu().numpy()
+                    # SB3-contrib QR-DQN uses 'quantile_net' not 'q_net'
+                    qnet = getattr(model.policy, 'quantile_net', None) or model.policy.q_net
+                    q = qnet(obs_t).mean(dim=1).squeeze().cpu().numpy()
                     mask = np.full(4, -1e9); mask[valid] = q[valid]
                     action = int(np.argmax(mask))
                     probs = _softmax(q).tolist()
