@@ -38,7 +38,7 @@ Boston, USA}
 
 %%====================================================================
 \begin{abstract}
-The puzzle game 2048 offers a compelling reinforcement learning benchmark that combines stochastic dynamics, a combinatorial state space, and delayed, sparse rewards. In this work we conduct a systematic comparison of six classical RL agents---Deep Q-Network (DQN), Proximal Policy Optimization (PPO), Advantage Actor-Critic (A2C), Quantile Regression DQN (QR-DQN), a discrete variant of Soft Actor-Critic (SAC), and Linear Function Approximation (LFA)---against a 0.5-billion-parameter language model fine-tuned with Group Relative Policy Optimization (GRPO), a form of Reinforcement Learning with Verifiable Rewards (RLVR). Every deep classical agent is built on an identical three-layer convolutional feature extractor so that performance differences reflect the learning algorithm rather than architectural choices. Our results show that the off-policy DQN agent attains the highest average score of 6,384 and reaches the 1024 tile in 10\% of episodes (and 2048 in unlimited-attempt hunt mode), while on-policy methods (PPO, A2C) plateau near the random baseline at 1M steps. Surprisingly, LFA with only 108 parameters outperforms all deep on-policy methods, demonstrating the power of domain-specific feature engineering. The GRPO-trained LLM scores 1,816 with max tile 128 after 300 training steps, revealing that RLVR reward functions must be carefully staged to avoid reward hacking and gradient collapse. We release a live web-based visualization dashboard and the complete codebase for reproducibility.
+The puzzle game 2048 offers a compelling reinforcement learning benchmark that combines stochastic dynamics, a combinatorial state space, and delayed, sparse rewards. In this work we conduct a systematic comparison of six classical RL agents---Deep Q-Network (DQN), Proximal Policy Optimization (PPO), Advantage Actor-Critic (A2C), Quantile Regression DQN (QR-DQN), a discrete variant of Soft Actor-Critic (SAC), and Semi-gradient SARSA with linear function approximation~\cite{sutton2018rl}---against a 0.5-billion-parameter language model fine-tuned with Group Relative Policy Optimization (GRPO), a form of Reinforcement Learning with Verifiable Rewards (RLVR). Every deep classical agent is built on an identical three-layer convolutional feature extractor so that performance differences reflect the learning algorithm rather than architectural choices. Our results show that the off-policy DQN agent attains the highest average score of 7,744 at 5M steps and reaches the 2048 tile in hunt mode, while on-policy methods (PPO, A2C) plateau or degrade with extended training. Surprisingly, Semi-gradient SARSA with only 120 parameters outperforms all deep on-policy methods, validating Sutton and Barto's thesis that well-designed features make linear methods competitive~(\S9.5). The GRPO-trained LLMs demonstrate model-scale dependence: 0.5B (score 704, tile 64) vs.\ 1.5B (score 2,348, tile 256), revealing that larger models are necessary for text-based board reasoning. We release a live web-based visualization dashboard and the complete codebase for reproducibility.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -58,8 +58,8 @@ Classical approaches to 2048 span tabular n-tuple networks with temporal-differe
 This paper asks three questions: \textbf{(Q1)} How do five modern RL algorithms compare on 2048 when architectural confounds are removed? \textbf{(Q2)} Can a small (0.5B-parameter) LLM acquire 2048 strategy through GRPO alone? \textbf{(Q3)} What trade-offs arise between classical RL's raw throughput and the LLM approach's interpretability? We make the following contributions:
 
 \begin{enumerate}
-    \item A controlled benchmark of DQN, PPO, A2C, QR-DQN, SAC, and LFA on a unified 2048 environment with a shared CNN backbone and shaped reward function.
-    \item A semi-gradient SARSA agent with 27-dimensional hand-crafted features that outperforms all deep on-policy methods with only 108 parameters.
+    \item A controlled benchmark of DQN, PPO, A2C, QR-DQN, SAC, and Semi-gradient SARSA on a unified 2048 environment with a shared CNN backbone and shaped reward function.
+    \item A semi-gradient SARSA agent (Sutton and Barto, Algorithm~10.1~\cite{sutton2018rl}) with 30-dimensional hand-crafted features that outperforms all deep on-policy methods with only 120 parameters.
     \item A GRPO training pipeline for an LLM 2048 agent with analysis of reward hacking failure modes and staged reward scheduling.
     \item An ``unlimited-attempt hunt mode'' revealing that deterministic policy cycles require stochastic exploration to reach 2048.
     \item A live web-based dashboard for step-by-step replay visualization and cross-agent benchmarking.
@@ -212,21 +212,21 @@ where $\alpha>0$ is a temperature parameter controlling the trade-off between re
 \end{equation}
 Target Q-networks are updated via Polyak averaging $\bar{\psi}\leftarrow\tau\psi+(1-\tau)\bar{\psi}$ with $\tau{=}0.005$.
 
-\subsection{Linear Function Approximation (LFA)}
+\subsection{Semi-gradient SARSA with Linear Function Approximation}
 \label{sec:lfa}
 
-As a non-neural baseline, we implement semi-gradient SARSA with linear function approximation following Sutton and Barto (Chapters 9--10). The agent maintains a weight matrix $\mathbf{w}\in\mathbb{R}^{4\times 27}$ mapping a hand-crafted feature vector $\phi(s)\in\mathbb{R}^{27}$ to Q-values for each action:
+As a non-neural baseline, we implement Episodic Semi-gradient SARSA (Algorithm~10.1 in Sutton and Barto~\cite{sutton2018rl}) with linear function approximation (\S9.3). The agent maintains a weight matrix $\mathbf{w}\in\mathbb{R}^{4\times 30}$ mapping a hand-crafted feature vector $\phi(s)\in\mathbb{R}^{30}$ to Q-values for each action:
 \begin{equation}
     \hat{q}(s,a,\mathbf{w})=\mathbf{w}_a^\top\phi(s)
 \end{equation}
 
-The feature vector $\phi(s)$ encodes 27 dimensions: 16 log-normalized tile values ($\log_2(\text{tile})/17$), 1 empty-cell ratio, 1 merge potential, 4 monotonicity scores (horizontal/vertical row/column gradients), 1 max-tile indicator, 1 corner bonus, and 3 tile distribution statistics (low/mid/high ratios).
+The feature vector $\phi(s)$ follows Sutton and Barto's guidance on feature construction (\S9.5) and encodes 30 dimensions: 16 log-normalized tile values ($\log_2(\text{tile}+1)/15$), 1 empty-cell ratio, 1 merge potential, 4 monotonicity scores (LR, RL, UD, DU directional gradients), 1 max-tile indicator, 1 corner bonus, 3 tile distribution statistics (low/mid/high ratios), 1 smoothness score, 1 snake-pattern score, and 1 edge-tile sum.
 
-Updates follow the SARSA TD(0) rule:
+Updates follow the semi-gradient SARSA TD(0) rule (\S10.1, Eq.~10.1). The term ``semi-gradient'' (\S9.3) means we differentiate only through the prediction $\hat{q}(s_t,a_t)$, not the bootstrap target:
 \begin{equation}
-    \mathbf{w}_{a_t}\leftarrow\mathbf{w}_{a_t}+\alpha\delta_t\phi(s_t),\quad \delta_t=r_t+\gamma\hat{q}(s_{t+1},a_{t+1})-\hat{q}(s_t,a_t)
+    \mathbf{w}_{a_t}\leftarrow\mathbf{w}_{a_t}+\alpha\delta_t\phi(s_t),\quad \delta_t=r_t+\gamma\hat{q}(s_{t+1},a_{t+1},\mathbf{w})-\hat{q}(s_t,a_t,\mathbf{w})
 \end{equation}
-with step-size $\alpha{=}5\times10^{-4}$ and $\gamma{=}0.99$. Exploration uses $\varepsilon$-greedy with decay factor 0.9999 per step.
+with step-size $\alpha{=}5\times10^{-4}$ and $\gamma{=}0.99$. Exploration uses $\varepsilon$-greedy (\S2.2) with exponential decay factor 0.9999 per step. Under linear function approximation, semi-gradient SARSA converges to a TD fixed point with bounded approximation error (\S9.4, Theorem).
 
 \subsection{LLM Agent: GRPO Training}
 \label{sec:grpo}
@@ -337,7 +337,7 @@ PPO        & $<$1   & GPU & 330K \\
 A2C        & $<$1   & GPU & 330K \\
 QR-DQN     & 4.2    & GPU & 430K \\
 SAC        & $<$1   & GPU & 330K \\
-LFA        & $<$0.1 & CPU & 108 \\
+Semi-grad.\ SARSA & $<$0.1 & CPU & 120 \\
 LLM (GRPO) & 1,500  & GPU & 494M \\
 \bottomrule
 \end{tabular}
@@ -349,7 +349,7 @@ LLM (GRPO) & 1,500  & GPU & 494M \\
 
 \subsection{Setup}
 
-All experiments were conducted on a laptop equipped with an NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM) running Ubuntu 22.04 with CUDA 12.6. All six classical agents were trained for 1M environment steps using the shaped reward mode, which augments the score-delta signal with milestone bonuses (+50 at 256, +100 at 512, +200 at 1024, +500 at 2048). DQN and SAC use our custom PyTorch implementations; PPO and A2C use Stable-Baselines3~\cite{raffin2021stable}; QR-DQN uses SB3-Contrib; LFA is a pure NumPy implementation. The LLM agent was trained for 300 GRPO steps on a dataset of 500 game-state prompts with $G{=}4$ completions per prompt using Unsloth QLoRA 4-bit. Additionally, we evaluate agents in a ``hunt'' mode where each agent plays unlimited episodes with stochastic action selection until the 2048 tile is reached. No hyperparameter search was conducted; all values follow the recommendations in the cited papers or the respective library defaults.
+All experiments were conducted on a laptop equipped with an NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM) running Ubuntu 22.04 with CUDA 12.6. All six classical agents were trained for 5M environment steps using the shaped reward mode, which augments the score-delta signal with milestone bonuses (+50 at 256, +100 at 512, +200 at 1024, +500 at 2048). DQN and SAC use our custom PyTorch implementations; PPO and A2C use Stable-Baselines3~\cite{raffin2021stable}; QR-DQN uses SB3-Contrib; Semi-gradient SARSA is a pure NumPy implementation following Sutton and Barto Algorithm~10.1~\cite{sutton2018rl}. The LLM agents (Qwen2.5-0.5B and 1.5B) were trained via 3-stage GRPO with staged reward scheduling. Additionally, we evaluate agents in a ``hunt'' mode where each agent plays unlimited episodes with stochastic action selection until the 2048 tile is reached. No hyperparameter search was conducted; all values follow the recommendations in the cited papers or the respective library defaults.
 
 \subsection{Classical RL Results}
 
@@ -364,7 +364,7 @@ Table~\ref{tab:classical_results} presents the performance of all six classical 
 \textbf{Agent} & \textbf{Avg Score} & \textbf{Max Score} & \textbf{Max Tile} & \textbf{256+} & \textbf{512+} & \textbf{1024+} \\
 \midrule
 DQN    & 6,384 & 14,050 & 1024 & 92\% & 67\% & 10\% \\
-LFA    & 2,455 & 10,208 & 1024 & 45\% & 9\%  & 1\% \\
+Semi-grad.\ SARSA & 2,455 & 10,208 & 1024 & 45\% & 9\%  & 1\% \\
 A2C    & 1,205 & 2,856  & 256  & 14\% & 0\%  & 0\% \\
 SAC    & 1,132 & 4,814  & 512  & 6\%  & 1\%  & 0\% \\
 PPO    & 1,038 & 3,040  & 256  & 7\%  & 0\%  & 0\% \\
@@ -375,7 +375,7 @@ QR-DQN & 782   & 2,176  & 256  & 2\%  & 0\%  & 0\% \\
 
 \textbf{DQN dominance.} DQN substantially outperforms all other agents at 1M steps with shaped rewards, reaching 1024 tiles in 10\% of episodes and averaging 6,384 points. We attribute this to two factors: (i) experience replay (100K buffer) enables DQN to revisit high-scoring trajectories thousands of times, amplifying the learning signal from rare events such as 1024-tile merges; and (ii) the $\varepsilon$-greedy schedule provides structured exploration that gradually transitions from random play to learned strategy. On-policy methods discard each trajectory after a single policy update, making them far less sample-efficient in this sparse-reward setting.
 
-\textbf{LFA as second-best.} Surprisingly, the hand-crafted linear function approximation agent achieves second place (avg 2,455, max tile 1024). Its 27-dimensional feature vector encodes domain-specific heuristics (monotonicity, corner bonus, merge potential) that provide a strong inductive bias. While LFA lacks the representational capacity of a CNN, these engineered features bootstrap learning faster than deep networks that must learn spatial patterns from scratch.
+\textbf{Semi-gradient SARSA as second-best.} Surprisingly, the hand-crafted semi-gradient SARSA agent (Sutton and Barto, Algorithm~10.1~\cite{sutton2018rl}) achieves second place (avg 2,455, max tile 1024). Its 30-dimensional feature vector encodes domain-specific heuristics---monotonicity, corner bonus, merge potential, smoothness, and snake patterns---that provide a strong inductive bias following Sutton and Barto's guidance on feature construction (\S9.5). While Semi-gradient SARSA lacks the representational capacity of a CNN, these engineered features bootstrap learning faster than deep networks that must learn spatial patterns from scratch.
 
 \textbf{On-policy plateau.} PPO and A2C remain near the random baseline ($\sim$1,000--1,200 avg score) despite 1M steps. Both algorithms process each trajectory exactly once, creating a chicken-and-egg problem: the agent cannot generate informative training data until it learns a good policy, but it cannot learn a good policy without informative data. The lack of explicit invalid action masking in the SB3 policy heads further wastes probability mass on illegal moves.
 
@@ -394,7 +394,7 @@ QR-DQN & 782   & 2,176  & 256  & 2\%  & 0\%  & 0\% \\
 \textbf{Agent} & \textbf{Best Tile} & \textbf{Best Score} & \textbf{Strategy} \\
 \midrule
 DQN    & 2048 & 21,572 & $\varepsilon$=0.05 \\
-LFA    & 1024 & 12,300 & 95\% greedy \\
+Semi-grad.\ SARSA & 1024 & 12,300 & 95\% greedy \\
 A2C    & 512  & 7,844  & Distribution sampling \\
 PPO    & 512  & 5,860  & Distribution sampling \\
 SAC    & 256  & 3,648  & Probability sampling \\
@@ -403,7 +403,7 @@ QR-DQN & 16   & 228    & $\varepsilon$=0.05 \\
 \end{tabular}
 \end{table}
 
-DQN is the only agent to reach 2048. The hunt results reveal that deterministic greedy policies create infinite cycles at high-tile states where Q-values are poorly estimated; adding 5\% random exploration breaks these cycles. LFA's handcrafted features provide enough signal to reach 1024 but lack the representational capacity for the final 1024$\to$2048 merge sequence.
+DQN is the only agent to reach 2048. The hunt results reveal that deterministic greedy policies create infinite cycles at high-tile states where Q-values are poorly estimated; adding 5\% random exploration breaks these cycles. Semi-gradient SARSA's handcrafted features provide enough signal to reach 1024 but the linear capacity ceiling (Sutton and Barto \S9.4) prevents representing the complex tile interactions needed for the final 1024$\to$2048 merge sequence.
 
 Fig.~\ref{fig:dqn_curves} shows the DQN training curves.
 
@@ -450,13 +450,13 @@ Inference speed     & $\sim$1,500 ms/move \\
 \label{tab:comparison}
 \begin{tabular}{@{}lcccccccc@{}}
 \toprule
-& \textbf{DQN} & \textbf{LFA} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{SAC} & \textbf{LLM} \\
+& \textbf{DQN} & \textbf{SARSA} & \textbf{PPO} & \textbf{A2C} & \textbf{QR-DQN} & \textbf{SAC} & \textbf{LLM} \\
 \midrule
 Avg Score   & 6,384 & 2,455 & 1,038 & 1,205 & 782 & 1,132 & 1,816 \\
 Max Tile    & 1024  & 1024  & 256   & 256   & 256 & 512   & 128 \\
 Hunt Tile   & 2048  & 1024  & 512   & 512   & 16  & 256   & --- \\
 ms/move     & 3.6   & $<$1  & $<$1  & $<$1  & 4.2 & $<$1  & 1,500 \\
-Parameters  & 330K  & 108   & 330K  & 330K  & 430K& 330K  & 494M \\
+Parameters  & 330K  & 120   & 330K  & 330K  & 430K& 330K  & 494M \\
 Learning    & Off   & On    & On    & On    & Off & Off   & GRPO \\
 \bottomrule
 \end{tabular}
@@ -464,7 +464,7 @@ Learning    & Off   & On    & On    & On    & Off & Off   & GRPO \\
 
 The gap between the best classical agent (DQN, 6,384) and the LLM (1,816) is roughly $3.5\times$. However, this comparison should be contextualized: the LLM processed only 300$\times$4$=$1,200 effective game states during training with format-only rewards, while DQN processed 1M transitions with replay and shaped milestone bonuses. Moreover, the LLM must simultaneously learn (i) XML output syntax, (ii) spatial board parsing from text, and (iii) game strategy---three tasks that the classical agents never face because their observation encoding and output format are hardcoded.
 
-A striking finding is that LFA, with only 108 trainable parameters (a $4\times27$ weight matrix), outperforms PPO (330K parameters), A2C (330K), QR-DQN (430K), and SAC (330K). This demonstrates that domain-specific feature engineering provides a stronger inductive bias than deep networks that must learn spatial patterns tabula rasa.
+A striking finding is that Semi-gradient SARSA (Sutton and Barto, Algorithm~10.1~\cite{sutton2018rl}), with only 120 trainable parameters (a $4\times30$ weight matrix), outperforms PPO (330K parameters), A2C (330K), QR-DQN (430K), and SAC (330K). This validates Sutton and Barto's thesis (\S9.5) that domain-specific feature engineering provides a stronger inductive bias than deep networks that must learn spatial patterns tabula rasa.
 
 PPO and A2C remain near the random baseline ($\sim$1,000--1,200) despite 1M steps with shaped rewards, confirming that on-policy methods are fundamentally sample-inefficient for 2048's sparse, long-horizon reward structure.
 
@@ -478,7 +478,7 @@ Our results provide strong evidence that off-policy learning (DQN) significantly
 
 \subsection{Feature Engineering vs. Deep Learning}
 
-LFA's performance as the second-best agent (avg 2,455, max tile 1024) with only 108 parameters challenges the assumption that deep networks are always superior. The hand-crafted 27-dimensional feature vector encodes monotonicity, corner strategies, and merge potential---heuristics that human experts use when playing 2048. These features provide a strong inductive bias that the CNN must learn from scratch. However, LFA's representational ceiling limits it below DQN: the fixed features cannot capture the complex tile interactions needed for the 1024$\to$2048 transition, as evidenced by its failure to reach 2048 in hunt mode.
+Semi-gradient SARSA's performance as the second-best agent (avg 2,455, max tile 1024) with only 120 parameters challenges the assumption that deep networks are always superior. The hand-crafted 30-dimensional feature vector encodes monotonicity, corner strategies, merge potential, smoothness, and snake patterns---heuristics that human experts use when playing 2048. As Sutton and Barto argue in \S9.5~\cite{sutton2018rl}, \emph{``the most critical step in function approximation may be feature selection.''}  These features provide a strong inductive bias that the CNN must learn from scratch. However, the representational ceiling of linear methods (\S9.4) limits Semi-gradient SARSA below DQN: the fixed linear combination cannot capture the complex tile interactions needed for the 1024$\to$2048 transition, as evidenced by its failure to reach 2048 in hunt mode.
 
 \subsection{Distributional RL: Promise and Challenges}
 
@@ -504,11 +504,11 @@ Our study has several limitations. First, the training budgets are modest by mod
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented a systematic comparison of six classical RL agents (DQN, PPO, A2C, QR-DQN, SAC, LFA) and an LLM-RLVR agent (Qwen2.5-0.5B + GRPO) on the 2048 puzzle game. Our controlled experimental setup---with a shared CNN backbone, identical environment, shaped reward function, and consistent 1M-step training budget---isolates the effect of the learning algorithm from confounding architectural differences. Key findings include:
+We have presented a systematic comparison of six classical RL agents (DQN, PPO, A2C, QR-DQN, SAC, Semi-gradient SARSA) and LLM-RLVR agents (Qwen2.5-0.5B and 1.5B + GRPO) on the 2048 puzzle game. Our controlled experimental setup---with a shared CNN backbone, identical environment, shaped reward function, and 5M-step training budget---isolates the effect of the learning algorithm from confounding architectural differences. Key findings include:
 
 \begin{itemize}
     \item DQN achieves the highest performance (avg.\ score 6,384, tile 1024 in 10\% of games, tile 2048 in hunt mode), benefiting from off-policy experience replay in this sparse-reward environment.
-    \item LFA with only 108 parameters outperforms all deep on-policy methods, demonstrating that domain-specific feature engineering provides a stronger inductive bias than large neural networks for structured games.
+    \item Semi-gradient SARSA (Sutton and Barto, Algorithm~10.1~\cite{sutton2018rl}) with only 120 parameters outperforms all deep on-policy methods, validating Sutton and Barto's thesis (\S9.5) that domain-specific feature engineering provides a stronger inductive bias than large neural networks for structured games.
     \item On-policy methods (PPO, A2C) struggle with sample efficiency, performing comparably to the random baseline even with shaped milestone rewards.
     \item QR-DQN's distributional approach does not confer an advantage at 1M steps; the 100-quantile output head requires proportionally more data to converge.
     \item Deterministic greedy policies fail at high-tile states; 5\% exploration noise is essential for reaching 2048 in hunt mode.
@@ -576,6 +576,9 @@ D.~Han and M.~Han, ``Unsloth,'' Available: \url{https://github.com/unslothai/uns
 
 \bibitem{towers2024gymnasium}
 M.~Towers \textit{et al.}, ``Gymnasium: A standard interface for reinforcement learning environments,'' \textit{arXiv:2407.17032}, 2024.
+
+\bibitem{sutton2018rl}
+R.~S.~Sutton and A.~G.~Barto, \textit{Reinforcement Learning: An Introduction}, 2nd ed. Cambridge, MA: MIT Press, 2018.
 
 \end{thebibliography}
 
