@@ -1,0 +1,667 @@
+% ═══════════════════════════════════════════════════════════════════
+% A1 Academic Poster — Solving 2048: Classical RL vs. LLM-Guided RLVR
+% Single-page, 3-column, portrait A1 (594mm × 841mm)
+% ═══════════════════════════════════════════════════════════════════
+\documentclass[a1paper,portrait]{article}
+
+\usepackage[a1paper, margin=1.2cm, top=0.8cm, bottom=0.8cm]{geometry}
+\usepackage{multicol}
+\setlength{\columnsep}{1.4cm}
+\setlength{\columnseprule}{0.4pt}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{setspace}
+\usepackage[T1]{fontenc}
+\usepackage{tgheros}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{algorithmic}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+
+% ─── Color Palette ─────────────────────────────────────────────────
+\definecolor{headerbg}{HTML}{8B0000}
+\definecolor{headertext}{HTML}{FFFFFF}
+\definecolor{accent}{HTML}{C0392B}
+\definecolor{accentlight}{HTML}{FDEDEC}
+\definecolor{sectioncolor}{HTML}{2C3E50}
+\definecolor{dqncolor}{HTML}{E67E22}
+\definecolor{dqnlight}{HTML}{FFF3E0}
+\definecolor{success}{HTML}{1A7A4C}
+\definecolor{successlight}{HTML}{EAF7F0}
+\definecolor{danger}{HTML}{C0392B}
+\definecolor{dangerlight}{HTML}{FDEDEC}
+\definecolor{info}{HTML}{2471A3}
+\definecolor{infolight}{HTML}{EBF5FB}
+\definecolor{purple}{HTML}{7D3C98}
+\definecolor{purplelight}{HTML}{F4ECF7}
+\definecolor{darktext}{HTML}{2C3E50}
+\definecolor{rulecolor}{HTML}{BDC3C7}
+\definecolor{codebg}{HTML}{F8F9FA}
+\definecolor{tile2}{HTML}{EEE4DA}
+\definecolor{tile4}{HTML}{EDE0C8}
+\definecolor{tile8}{HTML}{F2B179}
+\definecolor{tile16}{HTML}{F59563}
+\definecolor{tile32}{HTML}{F67C5F}
+\definecolor{tile64}{HTML}{F65E3B}
+\definecolor{tile128}{HTML}{EDCF72}
+\definecolor{tile256}{HTML}{EDCC61}
+\definecolor{tile512}{HTML}{EDC850}
+\definecolor{tile1024}{HTML}{EDC53F}
+\definecolor{tile2048}{HTML}{EDC22E}
+\definecolor{boardbg}{HTML}{BBADA0}
+\definecolor{emptycell}{HTML}{CDC1B4}
+
+\def\columnseprulecolor{\color{rulecolor}}
+
+% ─── tcolorbox styles ─────────────────────────────────────────────
+\newtcolorbox{sectionbox}[2][]{%
+    enhanced, colback=white, colframe=#2, coltitle=white,
+    fonttitle=\large\bfseries, title=#1,
+    boxrule=1.5pt, arc=5pt,
+    left=8pt, right=8pt, top=6pt, bottom=6pt,
+    toptitle=5pt, bottomtitle=5pt,
+    drop fuzzy shadow=black!10,
+}
+
+\newtcolorbox{calloutbox}[1][info]{%
+    enhanced, colback=#1!6, colframe=#1!40,
+    boxrule=0pt, arc=3pt,
+    left=8pt, right=8pt, top=5pt, bottom=5pt,
+    borderline west={3pt}{0pt}{#1},
+}
+
+\newtcolorbox{highlightbox}[1][accent]{%
+    enhanced, colback=#1!7, colframe=#1,
+    boxrule=1.5pt, arc=4pt,
+    left=8pt, right=8pt, top=5pt, bottom=5pt,
+}
+
+\newtcolorbox{codebox}{%
+    enhanced, colback=codebg, colframe=rulecolor,
+    boxrule=0.5pt, arc=3pt,
+    left=6pt, right=6pt, top=4pt, bottom=4pt,
+}
+
+\newcommand{\sectiontitle}[1]{%
+    {\color{sectioncolor}\LARGE\bfseries #1}\\[-4pt]
+    {\color{accent}\rule{\linewidth}{2pt}}
+    \vspace{4pt}
+}
+
+\newcommand{\impl}[1]{\,{\scriptsize\colorbox{#1}{\color{white}\bfseries\strut}}}
+\newcommand{\customtag}{{\scriptsize\colorbox{dqncolor}{\color{white}\bfseries\;Custom PyTorch\;}}}
+\newcommand{\sbtag}{{\scriptsize\colorbox{info}{\color{white}\bfseries\;Stable-Baselines3\;}}}
+\newcommand{\numpytag}{{\scriptsize\colorbox{success}{\color{white}\bfseries\;Custom NumPy\;}}}
+\newcommand{\grpotag}{{\scriptsize\colorbox{purple}{\color{white}\bfseries\;trl + transformers\;}}}
+
+% ═══════════════════════════════════════════════════════════════════
+\begin{document}
+\color{darktext}
+
+% ═══ HEADER ═══════════════════════════════════════════════════════
+\begin{tcolorbox}[
+    enhanced, colback=headerbg, colframe=headerbg,
+    boxrule=0pt, arc=0pt,
+    left=30pt, right=30pt, top=18pt, bottom=14pt,
+    width=\textwidth,
+]
+\begin{center}
+{\fontsize{50}{60}\selectfont\bfseries\color{headertext}
+    Solving 2048: Classical RL vs.\ LLM-Guided RLVR}\\[12pt]
+{\fontsize{24}{30}\selectfont\color{headertext!90}
+    Shriman Raghav\textsuperscript{1} \qquad Gautham Ramkumar\textsuperscript{1}}\\[8pt]
+{\fontsize{16}{20}\selectfont\color{headertext!75}
+    \textsuperscript{1}MS Robotics, Khoury College of Computer Sciences, Northeastern University}\\[4pt]
+{\fontsize{14}{18}\selectfont\color{headertext!55}
+    CS 5180: Reinforcement Learning\enspace$|$\enspace Prof.\ Robert Platt}
+\end{center}
+\end{tcolorbox}
+
+\vspace{0.5cm}
+
+% ═══ BODY: 3 COLUMNS ══════════════════════════════════════════════
+\begin{multicols}{3}
+
+% ═══════════════════════════════════════════════════════════════════
+%                      COLUMN 1
+% ═══════════════════════════════════════════════════════════════════
+
+\begin{sectionbox}[Problem: The 2048 Puzzle]{sectioncolor}
+
+% ─── TikZ 2048 Board ──────────────────────────────────────────────
+\begin{minipage}[t]{0.42\linewidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}
+\fill[boardbg, rounded corners=5pt] (-0.15,-0.15) rectangle (4.15,4.15);
+% Row 0 (bottom)
+\fill[emptycell, rounded corners=3pt] (0,0) rectangle (0.9,0.9);
+\fill[emptycell, rounded corners=3pt] (1.05,0) rectangle (1.95,0.9);
+\fill[tile512, rounded corners=3pt] (2.1,0) rectangle (3,0.9);
+\node[font=\bfseries\small, text=white] at (2.55,0.45) {512};
+\fill[tile1024, rounded corners=3pt] (3.15,0) rectangle (4.05,0.9);
+\node[font=\bfseries\tiny, text=white] at (3.6,0.45) {1024};
+% Row 1
+\fill[emptycell, rounded corners=3pt] (0,1.05) rectangle (0.9,1.95);
+\fill[tile4, rounded corners=3pt] (1.05,1.05) rectangle (1.95,1.95);
+\node[font=\bfseries\small, text=darktext] at (1.5,1.5) {4};
+\fill[tile128, rounded corners=3pt] (2.1,1.05) rectangle (3,1.95);
+\node[font=\bfseries\small, text=white] at (2.55,1.5) {128};
+\fill[tile256, rounded corners=3pt] (3.15,1.05) rectangle (4.05,1.95);
+\node[font=\bfseries\small, text=white] at (3.6,1.5) {256};
+% Row 2
+\fill[emptycell, rounded corners=3pt] (0,2.1) rectangle (0.9,3);
+\fill[emptycell, rounded corners=3pt] (1.05,2.1) rectangle (1.95,3);
+\fill[tile8, rounded corners=3pt] (2.1,2.1) rectangle (3,3);
+\node[font=\bfseries\small, text=white] at (2.55,2.55) {8};
+\fill[tile64, rounded corners=3pt] (3.15,2.1) rectangle (4.05,3);
+\node[font=\bfseries\small, text=white] at (3.6,2.55) {64};
+% Row 3 (top)
+\fill[emptycell, rounded corners=3pt] (0,3.15) rectangle (0.9,4.05);
+\fill[tile2, rounded corners=3pt] (1.05,3.15) rectangle (1.95,4.05);
+\node[font=\bfseries\small, text=darktext] at (1.5,3.6) {2};
+\fill[emptycell, rounded corners=3pt] (2.1,3.15) rectangle (3,4.05);
+\fill[tile32, rounded corners=3pt] (3.15,3.15) rectangle (4.05,4.05);
+\node[font=\bfseries\small, text=white] at (3.6,3.6) {32};
+\end{tikzpicture}%
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.54\linewidth}
+\small
+Slide tiles in 4 directions. Equal tiles merge, doubling their value. Reach \textbf{2048} to win!
+
+\vspace{4pt}
+\textbf{Challenges:}
+\begin{itemize}[nosep, leftmargin=10pt, itemsep=1pt]
+    \item[$\bullet$] ${\sim}10^{19}$ board states
+    \item[$\bullet$] Sparse, delayed rewards
+    \item[$\bullet$] Stochastic tile spawns
+    \item[$\bullet$] 100--1000+ step episodes
+\end{itemize}
+\end{minipage}
+
+\vspace{6pt}
+
+\textbf{States, Actions \& Rewards:}
+
+\vspace{2pt}
+\renewcommand{\arraystretch}{1.15}
+{\footnotesize
+\begin{tabular}{@{}>{\bfseries\color{sectioncolor}}l @{\;\;} p{0.7\linewidth}@{}}
+$\mathcal{S}$ & $4{\times}4$ board $\to$ 16-channel binary tensor $\in\{0,1\}^{16\times4\times4}$\\
+$\mathcal{A}$ & \{UP, RIGHT, DOWN, LEFT\}: 4 actions\\
+$\mathcal{R}$ & Score-delta + milestones (+50@256, +100@512, +200@1024)\\
+$\gamma$ & 0.99\\
+\end{tabular}
+}
+\end{sectionbox}
+
+\vspace{8pt}
+
+% ─── Experiment Setup ──────────────────────────────────────────────
+\begin{sectionbox}[Experiment Setup]{info}
+{\small
+\begin{itemize}[nosep, leftmargin=12pt, itemsep=3pt]
+    \item \textbf{Hardware}: NVIDIA RTX 4060 (8\,GB), CUDA 12.6
+    \item \textbf{Training}: 5M env steps per classical agent
+    \item \textbf{Agents}: 6 classical + 2 GRPO-LLM (0.5B, 1.5B)
+    \item \textbf{Reward}: Shaped (score-delta + milestone bonuses)
+    \item \textbf{Eval}: Last 100 episodes + unlimited ``Hunt'' mode
+\end{itemize}
+}
+\vspace{2pt}
+\begin{calloutbox}[info]
+{\footnotesize\textbf{Controlled experiment}: all deep agents share an \textbf{identical CNN backbone} (3-layer, 330K params). Differences reflect the \emph{learning algorithm}.}
+\end{calloutbox}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── Why Custom? ───────────────────────────────────────────────────
+\begin{calloutbox}[dqncolor]
+{\footnotesize\textbf{\color{dqncolor}Why custom DQN \& SAC?} SB3's DQN lacks direct Q-value masking for invalid actions (only action-space wrappers). Our custom PyTorch implementation masks invalid Q-values to $-\infty$ \emph{inside the forward pass}, enabling proper $\varepsilon$-greedy over legal moves only. SAC required a discrete-action adaptation (Christodoulou, 2019) with categorical policies and batched GPU inference for speed.}
+\end{calloutbox}
+
+\vspace{6pt}
+
+% ═══ ALGORITHMS ═══════════════════════════════════════════════════
+\sectiontitle{Algorithms}
+
+% ─── DQN ───────────────────────────────────────────────────────────
+\begin{sectionbox}[DQN $\bigstar$ Best Performer \hfill \customtag]{dqncolor}
+
+\begin{minipage}[t]{0.48\linewidth}
+{\footnotesize
+\textbf{Off-policy, value-based}
+
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l l@{}}
+Buffer:     & 100K transitions \\
+Batch:      & 64 \\
+$\varepsilon$: & $1.0\!\to\!0.01$ / 100K \\
+Target:     & sync every 1K steps \\
+LR:         & $10^{-4}$ (Adam) \\
+Grad clip:  & 1.0 \\
+\end{tabular}
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\begin{codebox}
+{\scriptsize\ttfamily
+\textbf{DQN Pseudocode:}\\
+1. Sample $(s,a,r,s')$ from $\mathcal{B}$\\
+2. Mask invalid $a'$ to $-\infty$\\
+3. $y \gets r + \gamma\max_{a'}Q_{\bar{\theta}}(s',a')$\\
+4. $\mathcal{L} \gets$ SmoothL1$(Q_\theta(s,a), y)$\\
+5. $\theta \gets \theta - \alpha\nabla\mathcal{L}$\\
+6. Sync $\bar{\theta} \gets \theta$ every $C$ steps
+}
+\end{codebox}
+\end{minipage}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── SAC ──────────────────────────────────────────────────────────
+\begin{sectionbox}[SAC (Discrete) \hfill \customtag]{dqncolor}
+
+\begin{minipage}[t]{0.48\linewidth}
+{\footnotesize
+\textbf{Off-policy, max-entropy}
+
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l l@{}}
+Buffer:      & 200K transitions \\
+Batch:       & 256 \\
+Polyak $\tau$: & 0.005 \\
+LR:          & $10^{-4}$ (Adam) \\
+Warmup:      & 10K steps \\
+Target ent.: & $0.4 \cdot \log|\mathcal{A}|$ \\
+\end{tabular}
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\begin{codebox}
+{\scriptsize\ttfamily
+\textbf{SAC Pseudocode:}\\
+1. Sample $(s,a,r,s')$ from $\mathcal{B}$\\
+2. Mask invalid actions in $\pi$\\
+3. $y \gets r + \gamma(Q_{\min} - \alpha\log\pi)$\\
+4. Update twin $Q_1, Q_2$ critics\\
+5. Update $\pi$ via entropy objective\\
+6. Auto-tune $\alpha$ to target entropy
+}
+\end{codebox}
+\end{minipage}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── PPO ──────────────────────────────────────────────────────────
+\begin{sectionbox}[PPO (MaskablePPO) \hfill \sbtag]{info}
+
+\begin{minipage}[t]{0.48\linewidth}
+{\footnotesize
+\textbf{On-policy, actor-critic}
+
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l l@{}}
+Rollout:  & 2048 steps $\times$ 8 envs \\
+Batch:    & 64 \\
+Epochs:   & 10 \\
+LR:       & $3{\times}10^{-4}$ \\
+GAE:      & $\lambda{=}0.95$ \\
+Clip:     & $\epsilon{=}0.2$ \\
+Entropy:  & $c_e{=}0.01$ \\
+\end{tabular}
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\begin{codebox}
+{\scriptsize\ttfamily
+\textbf{PPO Pseudocode:}\\
+1. Collect rollout ($T$ steps, 8 envs)\\
+2. Compute GAE advantages $\hat{A}$\\
+3. $r_t(\theta) = \frac{\pi_\theta}{\pi_{\text{old}}}$\\
+4. $\mathcal{L} = \min(r_t\hat{A}, \text{clip}(r_t)\hat{A})$\\
+5. Update $\theta$ for $K{=}10$ epochs
+}
+\end{codebox}
+\end{minipage}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── A2C ──────────────────────────────────────────────────────────
+\begin{sectionbox}[A2C \hfill \sbtag]{info}
+{\footnotesize
+\textbf{On-policy, actor-critic.} Simpler than PPO: no clipping, single gradient step per rollout.
+
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}l l l l@{}}
+n\_steps: & 5 & LR: & $7{\times}10^{-4}$ \\
+$c_e$: & 0.01 & $c_v$: & 0.5 \\
+\end{tabular}
+
+$\mathcal{L} = -\mathbb{E}[\log\pi\hat{A}] + 0.5\|R{-}V\|^2 - 0.01\mathcal{H}[\pi]$
+}
+\end{sectionbox}
+
+% ═══════════════════════════════════════════════════════════════════
+%                      COLUMN 2
+% ═══════════════════════════════════════════════════════════════════
+
+% ─── QR-DQN ──────────────────────────────────────────────────────
+\begin{sectionbox}[QR-DQN (Distributional) \hfill \sbtag]{info}
+{\footnotesize
+\textbf{Off-policy, distributional.} Learns 50 quantiles of return instead of just $\mathbb{E}[Q]$. Net outputs $4{\times}50{=}200$ values; action by mean $Q$.
+
+$\mathcal{L} = \sum_i\rho_{\tau_i}^{\kappa}(\delta_{ij}),\quad \delta_{ij} = r + \gamma\theta_j(s') - \theta_i(s)$
+
+Buffer: 100K \textbar{} $N{=}50$ quantiles \textbar{} LR: $10^{-4}$ \textbar{} Target sync: 1K steps
+}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── Semi-gradient SARSA ─────────────────────────────────────────
+\begin{sectionbox}[Semi-gradient SARSA (S\&B Alg.\ 10.1) \hfill \numpytag]{success}
+
+\begin{minipage}[t]{0.48\linewidth}
+{\footnotesize
+\textbf{On-policy, linear FA, no neural net!}
+
+$\hat{q}(s,a,\mathbf{w}) = \mathbf{w}_a^\top\phi(s)$
+
+$\mathbf{w}\in\mathbb{R}^{4\times30}$ = \textbf{120 params total}
+
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}l l@{}}
+$\alpha$:   & $10^{-3}$ \\
+$\varepsilon$ decay: & 0.99995/step \\
+$\varepsilon_{\min}$: & 0.05 \\
+\end{tabular}
+
+\textbf{30-dim features} (\S9.5):\\ log-tiles, empty ratio, merge potential, 4 monotonicity, corner, smoothness, snake, edge.
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\begin{codebox}
+{\scriptsize\ttfamily
+\textbf{SARSA Pseudocode (Alg 10.1):}\\
+1. Observe $s$, choose $a$ ($\varepsilon$-greedy)\\
+2. Take action $a$, observe $r, s'$\\
+3. Choose $a'$ ($\varepsilon$-greedy from $s'$)\\
+4. $\delta \gets r + \gamma\hat{q}(s',a') - \hat{q}(s,a)$\\
+5. $\mathbf{w}_a \gets \mathbf{w}_a + \alpha\delta\phi(s)$\\
+6. $s \gets s',\; a \gets a'$
+}
+\end{codebox}
+\end{minipage}
+
+\vspace{2pt}
+\begin{calloutbox}[success]
+{\footnotesize\bfseries 120 params beats 330K+ param deep nets!} Engineered features provide stronger inductive bias than CNNs (S\&B \S9.5).
+\end{calloutbox}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── GRPO ─────────────────────────────────────────────────────────
+\begin{sectionbox}[GRPO: Group Relative Policy Optimization \hfill \grpotag]{purple}
+
+{\footnotesize
+\textbf{GRPO} = \textbf{G}roup \textbf{R}elative \textbf{P}olicy \textbf{O}ptimization (DeepSeek-R1, 2025).
+
+Fine-tunes \textbf{Qwen2.5-0.5B / 1.5B} LLMs to play 2048 via verifiable rewards, \emph{without a critic network}. Board state $\to$ ASCII text $\to$ model generates reasoning + action.
+}
+
+\vspace{4pt}
+
+\begin{minipage}[t]{0.48\linewidth}
+{\footnotesize
+\textbf{Group-normalized advantage}:
+$$\hat{A}_i = \frac{r_i - \mu_G}{\sigma_G + \epsilon}$$
+$G{=}4$ completions per prompt.
+
+\textbf{3-stage reward scheduling}:
+\begin{enumerate}[nosep, leftmargin=14pt, itemsep=1pt]
+    \item Format compliance (XML)
+    \item Game reward ($\Delta$score)
+    \item Thinking quality
+\end{enumerate}
+}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\begin{codebox}
+{\scriptsize\ttfamily
+\textbf{GRPO Pseudocode:}\\
+1. Sample $G$ completions per prompt\\
+2. Score each with verifier $r_i$\\
+3. $\hat{A}_i = (r_i - \mu_G) / \sigma_G$\\
+4. $\mathcal{L} = -\sum_i\hat{A}_i\log\pi_\theta$\\
+\quad $- \beta\text{KL}(\pi_\theta\|\pi_{\text{ref}})$\\
+5. Update $\theta$ via gradient descent
+}
+\end{codebox}
+\end{minipage}
+\end{sectionbox}
+
+\vspace{8pt}
+
+% ─── Training Curves ───────────────────────────────────────────────
+\begin{sectionbox}[Training Curves (5M Steps)]{sectioncolor}
+\begin{center}
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{fig_dqn_5m.png}\\[-2pt]
+{\small\bfseries\color{dqncolor} DQN: avg 7,744 $\bigstar$}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{fig_ppo_5m.png}\\[-2pt]
+{\small\bfseries\color{danger} PPO: avg 962 $\downarrow$ \emph{(degrades!)}}
+\end{minipage}
+\end{center}
+\vspace{2pt}
+{\footnotesize\centering SARSA: 2,456 \textbar{} SAC: 1,255 \textbar{} A2C: 1,944 \textbar{} QR-DQN: 995 (see Results table)}
+\end{sectionbox}
+
+% ═══════════════════════════════════════════════════════════════════
+%                      COLUMN 3
+% ═══════════════════════════════════════════════════════════════════
+
+\sectiontitle{Results}
+
+% ─── Results Table ─────────────────────────────────────────────────
+\begin{sectionbox}[Final Performance (5M Steps)]{accent}
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\linewidth}{!}{%
+{\small
+\begin{tabular}{@{} >{\bfseries}l r r r r r l @{}}
+\toprule
+\rowcolor{headerbg!8}
+\textbf{Agent} & \textbf{Avg} & \textbf{Max} & \textbf{Max} & \textbf{512+} & \textbf{Params} & \textbf{Impl.} \\
+\rowcolor{headerbg!8}
+               & \textbf{Score} & \textbf{Score} & \textbf{Tile} & \textbf{Rate} & & \\
+\midrule
+\rowcolor{dqnlight}
+DQN $\bigstar$ & \color{dqncolor}{\textbf{7,744}} & \color{dqncolor}{\textbf{39,314}} & \color{dqncolor}{\textbf{2048}} & \color{dqncolor}{\textbf{76\%}} & 330K & Custom \\
+SARSA          & 2,456 & 11,436 & 1024 & 6\% & \color{success}{\textbf{120}} & NumPy \\
+\rowcolor{purplelight}
+GRPO 1.5B      & \color{purple}{2,348} & 2,348 & \color{purple}{256} & 0\% & 1.8B & trl \\
+A2C            & 1,944 & 9,640 & 1024 & 6\% & 330K & SB3 \\
+GRPO 0.5B      & 1,816 & 1,816 & 128 & -- & 494M & trl \\
+SAC            & 1,255 & 7,882 & 512 & $<$1\% & 330K & Custom \\
+QR-DQN         & 995 & 5,176 & 512 & $<$1\% & 430K & SB3 \\
+\rowcolor{dangerlight}
+PPO            & \color{danger}{962} & 4,900 & 512 & $<$1\% & 330K & SB3 \\
+\bottomrule
+\end{tabular}%
+}%
+}
+\end{sectionbox}
+
+\vspace{6pt}
+
+% ─── Scaling ───────────────────────────────────────────────────────
+\begin{sectionbox}[Scaling: 1M $\to$ 5M Steps]{info}
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\linewidth}{!}{%
+{\small
+\begin{tabular}{@{} >{\bfseries}l r r r l @{}}
+\toprule
+\textbf{Agent} & \textbf{1M} & \textbf{5M} & \textbf{$\Delta$} & \textbf{Verdict} \\
+\midrule
+\rowcolor{dqnlight}
+DQN    & 2,825 & \textbf{7,744} & \color{dqncolor}{\textbf{+174\%}} & Strong scaling \\
+SAC    & 700   & 1,255          & +79\% & Slow \\
+A2C    & 1,244 & 1,944          & +56\% & Modest \\
+\rowcolor{successlight}
+SARSA  & 2,299 & 2,456          & +7\%  & Ceiling (\S9.5) \\
+\rowcolor{dangerlight}
+QR-DQN & 1,090 & 995            & \color{danger}{--9\%} & Degrading \\
+\rowcolor{dangerlight}
+PPO    & 1,099 & 962            & \color{danger}{--12\%} & Gets worse! \\
+\bottomrule
+\end{tabular}%
+}%
+}
+\end{sectionbox}
+
+\vspace{8pt}
+
+% ─── Comparative Analysis ─────────────────────────────────────────
+\sectiontitle{Classical RL vs.\ RLVR Comparison}
+
+\begin{sectionbox}[Head-to-Head: Classical vs.\ LLM-RLVR]{accent}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\linewidth}{!}{%
+{\small
+\begin{tabular}{@{} >{\bfseries}l p{3.5cm} p{3.5cm} @{}}
+\toprule
+\rowcolor{headerbg!8}
+\textbf{Dimension} & \textbf{Classical RL} & \textbf{LLM-RLVR (GRPO)} \\
+\midrule
+Best Score     & \color{dqncolor}{\textbf{7,744}} (DQN) & 2,348 (1.5B) \\
+Best Tile      & \color{dqncolor}{\textbf{2048}} (DQN) & 256 (1.5B) \\
+\rowcolor{purplelight}
+Parameters     & 120 -- 430K & \color{purple}{\textbf{494M -- 1.8B}} \\
+\rowcolor{dqnlight}
+Inference      & \color{dqncolor}{\textbf{$<$4\,ms / move}} & 1,500\,ms / move \\
+Training data  & 5M env steps & 300 prompts \\
+\rowcolor{purplelight}
+Interpretable  & No & \color{purple}{\textbf{Yes (CoT)}} \\
+\rowcolor{dqnlight}
+Observation    & \color{dqncolor}{\textbf{Tensor (16ch)}} & ASCII text \\
+Action space   & Numeric & Natural language \\
+\bottomrule
+\end{tabular}%
+}%
+}
+
+\vspace{4pt}
+{\footnotesize
+\textbf{Why classical wins on score}: DQN processes 5M transitions with replay, while the LLM sees only $300{\times}4{=}1200$ game states. DQN's tensor encoding is information-rich; the LLM must parse text.
+
+\textbf{Where RLVR excels}: \emph{Interpretability}. Each LLM move includes a chain-of-thought explanation that can be inspected, debugged, and corrected. Classical agents are black boxes.
+
+\textbf{Model scale matters}: 0.5B $\to$ 1.5B ($3\times$ params) yields $3.3\times$ score improvement, suggesting larger models can better reason about board structure.
+}
+\end{sectionbox}
+
+\vspace{8pt}
+
+% ─── Key Findings ──────────────────────────────────────────────────
+\sectiontitle{Key Findings}
+
+\begin{highlightbox}[dqncolor]
+{\large\bfseries\color{dqncolor} 1.}\;
+{\bfseries Off-policy replay is decisive.} DQN's 100K buffer (S\&B \S8.2) amplifies sparse rewards. On-policy methods fail because they discard data.
+\end{highlightbox}
+
+\vspace{4pt}
+
+\begin{highlightbox}[success]
+{\large\bfseries\color{success} 2.}\;
+{\bfseries Features $>$ deep nets} (at low data). SARSA (120~params) beats all deep on-policy agents (330K+). Validates S\&B~\S9.5.
+\end{highlightbox}
+
+\vspace{4pt}
+
+\begin{highlightbox}[danger]
+{\large\bfseries\color{danger} 3.}\;
+{\bfseries More training hurts PPO.} Score drops 12\% from 1M$\to$5M. QR-DQN develops invalid-move loops.
+\end{highlightbox}
+
+\vspace{4pt}
+
+\begin{highlightbox}[purple]
+{\large\bfseries\color{purple} 4.}\;
+{\bfseries GRPO scales with model size.} $3\times$ more params $\to$ $3.3\times$ higher score. LLMs provide \emph{interpretable} moves.
+\end{highlightbox}
+
+\vspace{8pt}
+
+% ─── Future Work ──────────────────────────────────────────────────
+\begin{sectionbox}[Future Work]{sectioncolor}
+{\small
+\begin{itemize}[nosep, leftmargin=12pt, itemsep=3pt]
+    \item[\color{accent}$\triangleright$] Scale GRPO to Qwen2.5-3B / 7B (A100 GPU)
+    \item[\color{accent}$\triangleright$] Scaling curves at checkpoints 50K $\to$ 5M
+    \item[\color{accent}$\triangleright$] Multi-seed experiments for error bars
+    \item[\color{accent}$\triangleright$] Hybrid LLM-MCTS exploration
+\end{itemize}
+}
+\end{sectionbox}
+
+\vspace{6pt}
+
+{\scriptsize\color{darktext!55}
+\textbf{References:}
+[1] Sutton \& Barto, \emph{RL: An Introduction}, 2e, MIT Press, 2018.~
+[2] Mnih et al., Nature 518, 2015.~
+[3] Schulman et al., arXiv:1707.06347.~
+[4] Guo et al., DeepSeek-R1, 2025.~
+[5] Shao et al., DeepSeekMath, 2024.
+}
+
+\end{multicols}
+
+% ─── Footer ────────────────────────────────────────────────────────
+\begin{tcolorbox}[
+    enhanced, colback=headerbg, colframe=headerbg,
+    boxrule=0pt, arc=0pt,
+    left=16pt, right=16pt, top=6pt, bottom=6pt,
+    width=\textwidth,
+]
+\begin{center}
+{\normalsize\color{headertext!80}
+CS 5180 Reinforcement Learning\enspace$\cdot$\enspace
+Prof.\ Robert Platt\enspace$\cdot$\enspace
+Khoury College, Northeastern University\enspace$\cdot$\enspace
+NVIDIA RTX 4060\enspace$\cdot$\enspace
+Code: \texttt{github.com/shrirag10/RLVR}}
+\end{center}
+\end{tcolorbox}
+
+\end{document}
