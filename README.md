@@ -54,7 +54,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 
 ## Project Structure
 
-```
+```text
 RLVR/
 ├── src/
 │   ├── env/                     # 2048 Game Engine & Wrappers
@@ -118,7 +118,8 @@ The 2048 game is modeled as a finite-horizon MDP:
 - **Discount:** γ = 0.99
 
 All deep classical agents share an identical 3-layer CNN backbone:
-```
+
+```text
 Conv2D(16→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → FC(128→256)
 ```
 
