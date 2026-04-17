@@ -1,54 +1,86 @@
 # Solving 2048: Classical RL vs. LLM-Guided RLVR
 
-> **CS 5180 — Reinforcement Learning** &nbsp;|&nbsp; Northeastern University
+> **CS 5180 — Reinforcement Learning** &nbsp;|&nbsp; Northeastern University  
+> **Authors:** Shriman Raghav Srinivasan, Gautham Ramkumar  
+> **Report:** [AAAI-26 Format Paper](report/main.pdf) &nbsp;|&nbsp; [Poster](report/poster_a1.pdf)
 
-A comprehensive study comparing **six classical Reinforcement Learning agents** (DQN, PPO, A2C, QR-DQN, SAC, LFA) against an **LLM-based agent** trained with Reinforcement Learning from Verifiable Rewards (GRPO + Qwen2.5-0.5B) on the puzzle game **2048**.
-
-The project includes a custom Gymnasium environment, a multi-component verifiable reward system, an interactive web dashboard with live agent replay, a scaling-curve evaluator, and a full LaTeX research report.
-
----
-
-## ✨ Highlights
-
-- **7 agents** trained and benchmarked end-to-end on identical 2048 environments
-- **RLVR pipeline** — Qwen2.5-0.5B fine-tuned with GRPO using structured `<think>/<answer>` reasoning
-- **Interactive dashboard** — play 2048, view benchmark charts, and watch agent replays step-by-step with move probabilities
-- **Hunt-2048 mode** — runs each agent until it reaches tile 2048, logging the best episode as a dashboard replay
-- **Scaling curves** — `scaling_eval.py` evaluates every checkpoint milestone (50k → 5M steps) to plot sample-efficiency curves
-- **MaskablePPO** — PPO and A2C upgraded to `sb3_contrib.MaskablePPO` / `MaskableA2C` so illegal moves are masked at the policy level
-- **Full reproducibility** — YAML configs, CSV metrics, JSON replays, and a LaTeX report
+A systematic comparative study of **six classical Reinforcement Learning agents** and **two LLM-based RLVR agents** (GRPO-trained Qwen2.5-0.5B and 1.5B) on the puzzle game **2048**. All classical deep agents share an identical 3-layer CNN backbone (330K parameters) to isolate algorithmic effects from architectural differences.
 
 ---
 
-## 🏗 Project Structure
+## Key Findings
+
+| # | Finding | Evidence |
+|---|---------|----------|
+| 1 | **Off-policy replay is decisive** | DQN (7,744 avg) outperforms on-policy PPO (957 avg) by 8× on identical architectures |
+| 2 | **Hand-crafted features beat deep on-policy networks** | Semi-gradient SARSA with 120 parameters outperforms all deep on-policy agents (330K+ params) |
+| 3 | **More training can hurt on-policy agents** | PPO loses 8% score from 1M→5M steps, developing degenerate move loops |
+| 4 | **LLM scale drives RLVR performance** | 3× parameters (0.5B→1.5B) yields 3.3× score improvement (704→2,348) |
+| 5 | **DQN is the only agent to reach tile 2048** | In hunt mode (unlimited stochastic attempts), DQN reaches 2048 on attempt 3,902 |
+
+---
+
+## Results
+
+### Classical Agents — 5M Training Steps (single seed)
+
+| Agent | Impl. | Avg Score | Max Score | Max Tile | 512+ Rate | 1M→5M Δ |
+|-------|-------|-----------|-----------|----------|-----------|----------|
+| **DQN** | Custom PyTorch | **7,744** | **39,314** | **2048** | **76%** | +21% |
+| SARSA | Custom NumPy | 2,456 | 11,436 | 1024 | 6% | <1% |
+| A2C | SB3 | 1,964 | 9,640 | 1024 | 6% | +63% |
+| SAC | Custom PyTorch | 1,255 | 7,882 | 512 | <1% | +11% |
+| QR-DQN | SB3-Contrib | 1,003 | 4,508 | 512 | 0% | +28% |
+| PPO | SB3 (Maskable) | 957 | 4,900 | 512 | 0% | −8% |
+
+### GRPO-Trained LLMs — 500 Training Steps over 2,000 Prompts
+
+| Model | Avg Score | Max Tile | Params | ms/move | Training Time |
+|-------|-----------|----------|--------|---------|---------------|
+| **Qwen2.5-1.5B** | **2,348** | **256** | 1.8B | ~1,500 | ~76 min |
+| Qwen2.5-0.5B | 704 | 64 | 494M | ~1,500 | ~41 min |
+
+### Hunt Mode — 1M Checkpoint, ε=0.05, Unlimited Attempts
+
+| Agent | Attempts | Best Tile | Best Score |
+|-------|----------|-----------|------------|
+| **DQN** | 3,902 | **2048** | **21,572** |
+| SARSA | 3,000 | 1024 | 12,300 |
+| A2C | 3,000 | 512 | 7,844 |
+| SAC | 3,000 | 256 | 3,648 |
+| PPO | 193 | 64 | 520 |
+
+---
+
+## Project Structure
 
 ```
 RLVR/
 ├── src/
 │   ├── env/                     # 2048 Game Engine & Wrappers
 │   │   ├── game_2048.py         # Core engine (pure NumPy, 4×4 board)
-│   │   ├── gym_wrapper.py       # Gymnasium env (16-channel CNN input, action masking)
-│   │   └── text_wrapper.py      # Text wrapper (LLM prompt formatting)
+│   │   ├── gym_wrapper.py       # Gymnasium env (16-channel binary tensor, action masking)
+│   │   └── text_wrapper.py      # ASCII text wrapper for LLM prompt formatting
 │   │
-│   ├── classical/               # Track A — Classical RL Agents
-│   │   ├── dqn_agent.py         # Custom DQN (CNN, replay buffer, target net)
-│   │   ├── ppo_agent.py         # MaskablePPO via sb3_contrib (illegal-move masking)
-│   │   ├── a2c_agent.py         # MaskableA2C via sb3_contrib
-│   │   ├── qrdqn_agent.py       # QR-DQN via sb3_contrib
-│   │   ├── sac_agent.py         # Discrete SAC (custom, entropy-tuned, twin Q-nets)
-│   │   ├── lfa_agent.py         # Linear Function Approximation (n-tuple features)
-│   │   ├── hunt_2048.py         # Hunt-2048: run agents until tile 2048 is reached
-│   │   ├── replay_gen.py        # Best-episode replay JSON generator for the dashboard
-│   │   ├── export_all.py        # Batch export replays + manifest (parallel GPU workers)
-│   │   ├── scaling_eval.py      # Evaluate milestone checkpoints → scaling_curves.json
+│   ├── classical/               # Classical RL Agents
+│   │   ├── dqn_agent.py         # Custom DQN (CNN, 100K replay buffer, target net, n_envs=1)
+│   │   ├── ppo_agent.py         # MaskablePPO via SB3 (rollout=512, n_envs=8)
+│   │   ├── a2c_agent.py         # A2C via SB3 (5-step returns, n_envs=8)
+│   │   ├── qrdqn_agent.py       # QR-DQN via SB3-Contrib (50 quantiles, n_envs=8)
+│   │   ├── sac_agent.py         # Discrete SAC (custom, twin Q-nets, 200K buffer, n_envs=8)
+│   │   ├── lfa_agent.py         # Semi-gradient SARSA (30-dim features, 120 parameters)
+│   │   ├── hunt_2048.py         # Hunt mode: unlimited attempts until tile 2048
+│   │   ├── replay_gen.py        # Best-episode replay JSON generator
+│   │   ├── export_all.py        # Batch export replays + manifest
+│   │   ├── scaling_eval.py      # Evaluate milestone checkpoints → scaling curves
 │   │   └── train.py             # Unified CLI: train / eval / replay
 │   │
-│   ├── llm/                     # Track B — LLM-RLVR Agent
-│   │   ├── train_grpo.py        # GRPO training pipeline (Unsloth + TRL)
+│   ├── llm/                     # LLM-RLVR Agents
+│   │   ├── train_grpo.py        # GRPO training (Unsloth + TRL + Qwen2.5)
 │   │   ├── reward.py            # Multi-component verifiable reward functions
-│   │   ├── dataset.py           # Board-state dataset generator
+│   │   ├── dataset.py           # Board-state dataset generator (2,000 prompts)
 │   │   ├── predict.py           # Inference / evaluation for trained LLM
-│   │   ├── prompt.py            # System prompt template
+│   │   ├── prompt.py            # System prompt template (<think>/<answer>)
 │   │   └── replay_gen.py        # LLM replay generator
 │   │
 │   ├── utils/
@@ -56,48 +88,104 @@ RLVR/
 │   └── visualize.py             # Standalone visualization utilities
 │
 ├── configs/                     # YAML hyperparameter configs
-│   ├── dqn_config.yaml
-│   ├── ppo_config.yaml
-│   └── grpo_config.yaml
+├── tests/                       # pytest suite (env + reward tests)
+├── report/                      # AAAI-26 format LaTeX report + poster
+│   ├── main.tex / main.pdf      # 10-page comparative study
+│   ├── poster_a1.tex            # A1 research poster
+│   ├── aaai26.sty               # AAAI style file
+│   └── fig_*.png                # All figures (training curves, comparisons)
 │
-├── tests/                       # pytest suite
-│   ├── test_env.py              # Environment correctness tests
-│   └── test_reward.py           # Reward function tests
+├── logs/                        # Training outputs (per-agent subdirectories)
+│   ├── dqn_5m/ ppo_5m/ ...      # Classical agent logs, checkpoints, replays
+│   ├── grpo_0.5b/ grpo_1.5b/    # GRPO adapter weights, merged models, train logs
+│   └── manifest.json            # Agent registry for dashboard
 │
-├── report/                      # LaTeX research report
-│   ├── main.tex
-│   ├── references.bib
-│   └── fig_*.png                # Training-curve figures
-│
-├── logs/                        # Training outputs (git-ignored)
-│   ├── manifest.json            # Agent registry for the dashboard
-│   ├── manifest_5m.json         # Registry for 5M-step runs
-│   ├── scaling_curves.json      # Scaling evaluation results (generated)
-│   ├── <agent>/
-│   │   ├── *_metrics.csv        # Per-episode training metrics
-│   │   ├── replays.json         # Best-episode replay for dashboard
-│   │   ├── hunt_replays.json    # Hunt-2048 best episode replay
-│   │   └── hunt_2048.jsonl      # Every hunt attempt, one JSON per line
-│   └── grpo/
-│       ├── adapter/             # LoRA adapter weights
-│       ├── merged/              # Full merged model (16-bit)
-│       └── train_log.jsonl      # Per-step GRPO training log
-│
-├── requirements/
-│   ├── base.txt                 # numpy, gymnasium, matplotlib, pandas, tqdm
-│   ├── classical.txt            # + torch, stable-baselines3, sb3_contrib
-│   └── llm.txt                  # + unsloth, trl, transformers, peft
-│
-├── index.html                   # Interactive dashboard (primary)
-├── Front_end.html               # Alternate dashboard layout
-├── serve.py                     # Dev HTTP server for the dashboard
-├── Design.md                    # UI design-system document
-└── RL_Project.pdf               # Compiled research report PDF
+├── index.html                   # Interactive web dashboard
+├── serve.py                     # Dev HTTP server
+└── requirements/                # Dependency files (base, classical, llm)
 ```
 
 ---
 
-## 🚀 Quick Start
+## Environment Design
+
+The 2048 game is modeled as a finite-horizon MDP:
+
+- **State space:** 16-channel binary tensor `x ∈ {0,1}^{16×4×4}` (CNN agents) or labeled ASCII grid (LLM agents)
+- **Action space:** {UP, RIGHT, DOWN, LEFT} — 4 discrete actions
+- **Transition:** Deterministic tile-sliding + stochastic spawn (90% tile-2, 10% tile-4)
+- **Reward:** Score-delta + milestone bonuses (+50 at 256, +100 at 512, +200 at 1024) + penalty for invalid moves (−1)
+- **Discount:** γ = 0.99
+
+All deep classical agents share an identical 3-layer CNN backbone:
+```
+Conv2D(16→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → FC(128→256)
+```
+
+---
+
+## Agent Details
+
+### Custom Implementations (PyTorch / NumPy)
+
+**DQN** — Custom PyTorch implementation with invalid Q-value masking inside the forward pass (SB3's DQN lacks this). Replay buffer 100K, batch 64, ε: 1.0→0.01 over 100K steps, target sync every 1K steps, lr=1e-4, gradient clipping 1.0.
+
+**SAC (Discrete)** — Custom adaptation of Christodoulou (2019) with categorical policies, twin Q-networks, and automatic temperature tuning. Buffer 200K, batch 256, Polyak τ=0.005, target entropy 0.4·log|A|.
+
+**Semi-gradient SARSA** — Sutton & Barto Algorithm 10.1 with 30-dimensional hand-crafted features:
+
+| Features (30 total) | Dim | Description |
+|---------------------|-----|-------------|
+| Log-tile values | 16 | `log₂(B[i,j]+1)/16` for each cell |
+| Empty ratio | 1 | Fraction of empty cells |
+| Merge potential | 1 | Count of adjacent equal pairs, normalized |
+| Monotonicity | 4 | One score per row/column direction |
+| Max-tile indicator | 1 | `log₂(max B)/16` |
+| Corner bonus | 1 | `1` if max tile is in a corner |
+| Tile distribution | 3 | Mean/std/max of log-tile values |
+| Smoothness | 1 | Negative sum of adjacent tile differences |
+| Snake pattern | 1 | Score measuring zigzag tile arrangement |
+| Edge-tile sum | 1 | Sum of log-tiles on board edges |
+
+Weight matrix: `w ∈ ℝ^{4×30}` = 120 parameters. Step-size α=1e-3, ε-decay 0.99995/step, ε_min=0.05.
+
+### Stable-Baselines3 Agents
+
+**PPO** (MaskablePPO) — Rollout 512 steps × 8 envs, batch 128, 4 epochs, lr=2e-4, γ=0.995, clip ε=0.2, entropy coef=0.05.
+
+**A2C** — 5-step returns, lr=7e-4, entropy coef=0.01, value coef=0.5.
+
+**QR-DQN** — 50 quantiles (4×50=200 output values), buffer 100K, batch 64, lr=1e-4, target sync 1K steps.
+
+### GRPO-Trained LLMs
+
+**Training Pipeline:** Qwen2.5-Instruct models fine-tuned via GRPO (Group Relative Policy Optimization) using 4-bit NF4 quantization via Unsloth + LoRA (r=16, α=16).
+
+| Parameter | 0.5B Model | 1.5B Model |
+|-----------|------------|------------|
+| Base model | Qwen2.5-0.5B-Instruct | Qwen2.5-1.5B-Instruct |
+| Parameters | 494M | 1.8B |
+| Dataset | 2,000 board-state prompts | 2,000 board-state prompts |
+| Generations per prompt (G) | 4 | 4 |
+| Training steps | 500 | 500 |
+| Epochs | 3 | 3 |
+| Learning rate | 1e-6 | 5e-7 |
+| LoRA r / α | 16 / 16 | 16 / 16 |
+| Training time | ~41 min | ~76 min |
+| Seed | 42 | 42 |
+
+**Why Local GRPO, Not an LLM API?** GRPO requires per-token log-probabilities and their gradients for the clipped policy update — commercial APIs don't expose model weights or gradient computation. Local deployment also ensures deterministic training under fixed seeds.
+
+**Reward Schedule (3-stage curriculum):**
+1. Steps 0–100: Format compliance only (XML tag structure, weight 0.5)
+2. Steps 100–200: + Direction validity (weight 0.5)
+3. Steps 200–500: + Game reward (Δscore/max_tile, weight 2.0)
+
+Length and quality bonuses were removed after reward-hacking was detected (model generated filler text to maximize length rewards).
+
+---
+
+## Quick Start
 
 ### 1. Environment Setup
 
@@ -106,235 +194,109 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements/base.txt
 ```
 
-### 2. Play 2048 Interactively (Terminal)
+### 2. Play 2048 Interactively
 
 ```bash
 python -m src.env.game_2048
 # Controls: W=Up, A=Left, S=Down, D=Right, Q=Quit
 ```
 
-### 3. Run Tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-### 4. Launch the Web Dashboard
-
-```bash
-python serve.py          # opens http://localhost:8080
-python serve.py 9000     # or specify a custom port
-```
-
-Dashboard views:
-
-| View | Description |
-|------|-------------|
-| **Play 2048** | Full interactive game with undo, score tracking, and tile spectrum |
-| **Benchmark** | Score convergence charts, tile milestone distributions, and comparative metrics across all agents |
-| **Agent Playback** | Step-by-step replay of trained agents with move-probability bars, reasoning logs (LLM), and score-progression charts |
-
----
-
-## 🎓 Training Agents
-
-### Track A — Classical RL
+### 3. Train Classical Agents
 
 ```bash
 pip install -r requirements/classical.txt
 
-# DQN (custom CNN + replay buffer + target network)
-python -m src.classical.train train --agent dqn --steps 500000
+# DQN (custom, ~2 hrs for 5M steps)
+python -m src.classical.train train --agent dqn --steps 5000000 --mode 5m
 
-# PPO (MaskablePPO + custom CNN feature extractor)
-python -m src.classical.train train --agent ppo --steps 1000000
+# PPO (SB3, MaskablePPO)
+python -m src.classical.train train --agent ppo --steps 5000000 --mode 5m
 
-# A2C (MaskableA2C + custom CNN feature extractor)
-python -m src.classical.train train --agent a2c --steps 1000000
-
-# QR-DQN (quantile regression, distributional RL)
-python -m src.classical.train train --agent qrdqn --steps 500000
-
-# SAC (discrete, entropy-tuned, twin Q-networks)
-python -m src.classical.train train --agent sac --steps 500000
-
-# LFA (linear function approximation with n-tuple features)
-python -m src.classical.train train --agent lfa --steps 500000
+# Semi-gradient SARSA (NumPy, very fast)
+python -m src.classical.train train --agent lfa --steps 5000000 --mode 5m
 ```
 
-**Common options:**
-```bash
---reward {score_delta,log_score,shaped}   # reward shaping mode
---lr 0.0003                               # learning rate override
---num-envs 8                              # parallel environments (on-policy)
---seed 42                                 # random seed
---log-dir logs                            # output directory
---mode {1m,5m}                            # training mode (appends suffix, e.g. logs/dqn_5m/)
-```
-
-### Track B — LLM-RLVR (requires GPU)
+### 4. Train GRPO LLM Agent (requires GPU)
 
 ```bash
 pip install -r requirements/llm.txt
 
 # GRPO training — Qwen2.5-0.5B + QLoRA 4-bit
 python -m src.llm.train_grpo \
-  --dataset-size 10000 \
+  --dataset-size 2000 \
   --epochs 3 \
-  --num-generations 8 \
-  --lr 5e-6 \
-  --config configs/grpo_config.yaml
-
-# Run inference on a trained model
-python -m src.llm.predict --model logs/grpo/merged --episodes 50
+  --num-generations 4 \
+  --lr 1e-6
 ```
 
-### Evaluation & Replay Generation
+### 5. Hunt Mode
 
 ```bash
-# Evaluate a checkpoint
-python -m src.classical.train eval --agent dqn --model logs/dqn/dqn_final.pt --episodes 100
-
-# Generate the best-episode replay JSON for the dashboard
-python -m src.classical.train replay --agent dqn --model logs/dqn/dqn_final.pt --episodes 10
-```
-
-### Batch Export (All Agents → Dashboard Ready)
-
-```bash
-# Generate replays + manifest for all trained agents
-python -m src.classical.export_all
-
-# Force regenerate even if replays already exist
-python -m src.classical.export_all --force
-
-# Export 5M-step run variant
-python -m src.classical.export_all --mode 5m
-```
-
-### Hunt-2048 (Run Until Tile 2048)
-
-```bash
-# Run all agents until each reaches tile 2048 (unlimited attempts)
+# Run agents until tile 2048 or 3,000 attempts exhausted
 python -m src.classical.hunt_2048
-
-# Run a subset
-python -m src.classical.hunt_2048 --agents dqn lfa
-
-# Use 5M-step checkpoints
-python -m src.classical.hunt_2048 --mode 5m
+python -m src.classical.hunt_2048 --agents dqn lfa  # subset
 ```
 
-### Scaling Curve Evaluation
+### 6. Launch Web Dashboard
 
 ```bash
-# Evaluate all milestone checkpoints (50k, 100k, 200k, 500k, 1M, 2M, 5M steps)
-python -m src.classical.scaling_eval
-
-# Evaluate specific agents with 50 episodes per checkpoint
-python -m src.classical.scaling_eval --agents dqn lfa --episodes 50
+python serve.py          # http://localhost:8080
 ```
 
-Outputs `logs/scaling_curves.json` with per-step metrics for each agent.
+| Dashboard View | Description |
+|----------------|-------------|
+| **Play 2048** | Interactive game with undo, score tracking |
+| **Benchmark** | Score convergence charts, comparative metrics |
+| **Agent Playback** | Step-by-step replay with move-probability bars |
+
+### 7. Run Tests
+
+```bash
+python -m pytest tests/ -v
+```
 
 ---
 
-## 📊 Agent Comparison
-
-### Trained Agents
-
-| Track | Agent | Method | Framework | Key Features |
-|-------|-------|--------|-----------|--------------|
-| A | **DQN** | Custom CNN + Replay + Target Net | PyTorch | 16-channel board encoding, ε-greedy, prioritized replay |
-| A | **PPO** | MaskablePPO + Custom CNN Extractor | sb3_contrib | Clipped surrogate, GAE, invalid-move masking, multi-env |
-| A | **A2C** | MaskableA2C + Custom CNN Extractor | sb3_contrib | Synchronous advantage actor-critic, invalid-move masking |
-| A | **QR-DQN** | Quantile Regression DQN | sb3_contrib | Distributional value function, risk-sensitive learning |
-| A | **SAC** | Discrete Soft Actor-Critic | PyTorch (custom) | Entropy-tuned, twin Q-networks, temperature auto-tuning |
-| A | **LFA** | N-Tuple Linear FA | NumPy | Handcrafted tile-pattern features, no neural network |
-| B | **GRPO** | Qwen2.5-0.5B + GRPO + QLoRA | Unsloth + TRL | Structured `<think>/<answer>` chain-of-thought reasoning |
-
-### Results Summary
-
-| Agent | Avg Score | Max Tile | 512+ Rate | 1024+ Rate | Hunt Best |
-|-------|-----------|----------|-----------|------------|-----------|
-| **DQN** | 2,825 | 1024 | 16.9% | 1.2% | 21,572 (2048✓) |
-| **LFA** | 2,299 | 1024 | 4.4% | 0.01% | 12,300 (1024) |
-| **GRPO** | 1,816 | 128 | — | — | — |
-| **A2C** | 1,244 | 512 | 0.2% | — | 7,844 (512) |
-| **PPO** | 1,099 | 512 | 0.01% | — | 5,860 (512) |
-| **QR-DQN** | 1,090 | 256 | — | — | 228 |
-| **SAC** | ~700* | 256 | — | — | 3,648 (256) |
-
-> *SAC training metrics CSV not available; replay score is 2,644.
-
-> **Hunt-2048 Enhancement:** DQN + Hunt achieves a best score of **21,572** with max tile **2048**, demonstrating that greedy search amplification can push learned policies past their standalone ceiling.
-
-### Reward System (LLM Track)
-
-The GRPO training uses five decomposed verifiable reward functions:
-
-| Component | Value | Description |
-|-----------|-------|-------------|
-| Length reward | 0 → +0.3 | Encourages substantive completions; breaks zero-variance GRPO trap |
-| Format correctness | +0.5 | Valid `<think>` and `<answer>` XML tags (partial: +0.25) |
-| Valid direction | +0.5 | Answer ∈ {UP, DOWN, LEFT, RIGHT} |
-| Move validity | +1 / −2 | Move changes board / no-op penalty |
-| Score delta | Δs / 1024 | Normalized merge score |
-| Game over penalty | −1.0 | Terminal state reached |
-| Milestone bonus | +2 … +10 | First time reaching 256 / 512 / 1024 / 2048+ |
-| Thinking quality | 0 → +0.5 | Tile-value awareness + strategic vocabulary in `<think>` |
-
----
-
-## 🎯 Metrics Tracked
-
-- Max tile reached (distribution across episodes)
-- Average & max episode score
-- Sample efficiency (score vs. training steps — see scaling curves)
-- Tile milestone reach rates (256+, 512+, 1024+)
-- Moves per episode (including invalid-move rate)
-- Wall-clock training time
-- Per-step reward decomposition (LLM track)
-
----
-
-## 🔧 Hardware & Requirements
+## Hardware
 
 | Resource | Specification |
 |----------|---------------|
-| **GPU** | NVIDIA RTX 4060 (6 GB VRAM) |
-| **GRPO VRAM** | ~3–4 GB (0.5B model, QLoRA 4-bit, G=8) |
+| **GPU** | NVIDIA RTX 4060 Laptop (8 GB VRAM) |
+| **GRPO VRAM** | ~4–6 GB (0.5B/1.5B model, QLoRA 4-bit, G=4) |
 | **Python** | 3.10+ |
-| **OS** | Linux (tested on Ubuntu) |
-
-### Dependency Matrix
-
-| Package | Version | Used By |
-|---------|---------|---------|
-| numpy | ≥ 1.24 | All |
-| gymnasium | ≥ 0.29 | All |
-| torch | ≥ 2.0 | DQN, SAC, PPO, A2C, QR-DQN |
-| stable-baselines3 | ≥ 2.3 | PPO, A2C |
-| sb3_contrib | ≥ 2.3 | QR-DQN, MaskablePPO, MaskableA2C |
-| unsloth | latest | GRPO training |
-| trl | ≥ 0.24 | GRPO training |
-| transformers | ≥ 4.40 | GRPO inference |
-| peft | latest | LoRA adapter |
+| **OS** | Ubuntu 22.04, CUDA 12.6 |
 
 ---
 
-## 📚 References
+## Report & Poster
+
+The research report follows the **AAAI-26 conference format** and covers:
+
+1. **Abstract** — Problem statement and key results
+2. **Introduction** — Why 2048 is a challenging benchmark; classical RL vs RLVR motivation
+3. **Background** — MDP formulation, value-based methods, policy-gradient methods, linear FA, GRPO
+4. **Related Work** — n-tuple TD networks (SOTA at tile 65536), deep RL for games, LLMs for game-playing, RLVR
+5. **Project Description** — Environment, shared CNN backbone, all agent implementations with hyperparameters, GRPO pipeline
+6. **Experiments** — 1M/5M/Hunt mode evaluation tiers, mechanism analysis of DQN dominance, on-policy degradation, GRPO scaling and spatial failure analysis
+7. **Conclusion** — Four key findings with appropriate hedging for single-seed limitations
+
+---
+
+## References
 
 1. Guo et al. (2025). _DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning._ Nature.
-2. Wen et al. (2025). _RLVR Implicitly Incentivizes Reasoning in LLMs._
-3. Saligram et al. (2025). _2048: RL in a Delayed Reward Environment._
-4. Hu et al. (2025). _lmgame-Bench: How Good are LLMs at Playing Games?_
+2. Shao et al. (2024). _DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models._
+3. Sutton & Barto (2018). _Reinforcement Learning: An Introduction._ 2nd ed. MIT Press.
+4. Mnih et al. (2015). _Human-Level Control Through Deep Reinforcement Learning._ Nature.
 5. Schulman et al. (2017). _Proximal Policy Optimization Algorithms._
-6. Dabney et al. (2018). _Distributional Reinforcement Learning with Quantile Regression._
-7. Haarnoja et al. (2018). _Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning._
+6. Haarnoja et al. (2018). _Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning._
+7. Dabney et al. (2018). _Distributional Reinforcement Learning with Quantile Regression._
+8. Szubert & Jaśkowski (2014). _Temporal Difference Learning of N-Tuple Networks for the Game 2048._
+9. Hu et al. (2025). _lmgame-Bench: How Good are LLMs at Playing Games?_
+10. Raffin et al. (2021). _Stable-Baselines3: Reliable Reinforcement Learning Implementations._
 
 ---
 
-## 📄 License
+## License
 
-This project was developed as part of the CS 5180 Reinforcement Learning course at Northeastern University.
+This project was developed as part of CS 5180 (Reinforcement Learning) taught by Professor Robert Platt at Northeastern University.
