@@ -257,17 +257,17 @@ Table~\ref{tab:5m_results} shows the same agents at the 5M-step checkpoint. The 
 \midrule
 \rowcolor{dqncolor!10}
 DQN     & \textbf{7,744} & \textbf{39,314} & \textbf{2048} & \textbf{76\%} & \color{dqncolor}{\textbf{+21\%}} & Strong scaling \\
-SARSA   & 2,456 & 11,436 & 1024 & 6\%   & $<$1\%   & Ceiling (\S9.4) \\
+SARSA   & 2,456 & 11,436 & 1024 & 6\%   & $<$1\%   & Convergence \\
 A2C     & 1,964 & 9,640  & 1024 & 6\%   & +63\%  & Modest gain \\
 SAC     & 1,255 & 7,882  & 512  & $<$1\% & +11\% & Slow \\
 QR-DQN  & 1,003 & 4,508  & 512  & 0\%   & +28\%  & Modest gain \\
-PPO     & 957   & 4,900  & 512  & 0\%   & \color{red}{$-$8\%} & Gets worse \\
+PPO     & 957   & 4,900  & 512  & 0\%   & \color{red}{$-$8\%} & Degradation \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-\textbf{DQN scales strongly} (+21\%), confirming that off-policy replay continues to benefit from additional data accumulation. The replay buffer acts as a reservoir of high-scoring trajectories that are revisited thousands of times, a mechanism unavailable to on-policy methods. \textbf{SARSA reaches its representational ceiling} ($<$1\% gain), consistent with the bounded approximation error under linear function approximation~(S\&B~\S9.4). The 120-parameter linear model cannot represent the complex tile interactions required for merges beyond 1024. \textbf{PPO degrades} ($-$8\%), developing degenerate tile-sliding loops where the policy repeatedly selects the same two directions. A2C shows the strongest relative improvement (+63\%), suggesting that the simpler actor-critic update is more stable than PPO's clipped objective on this task.
+Three distinct scaling regimes emerge. DQN exhibits strong positive scaling (+21\%), consistent with off-policy replay continuing to benefit from additional data accumulation: the replay buffer serves as a reservoir of high-scoring trajectories that are revisited thousands of times, a mechanism unavailable to on-policy methods. SARSA shows negligible improvement ($<$1\% gain), consistent with the bounded approximation error under linear function approximation~(S\&B~\S9.4); the 120-parameter linear model lacks the representational capacity for the complex tile interactions required beyond 1024. PPO exhibits performance degradation ($-$8\%), developing degenerate tile-sliding loops in which the policy repeatedly selects the same two directions. A2C shows the strongest relative improvement (+63\%), suggesting that the simpler actor-critic update may be more stable than PPO's clipped objective on this task.
 
 Figure~\ref{fig:sample_efficiency} quantifies these scaling behaviors as a grouped bar chart, making the divergence between off-policy and on-policy methods visually apparent.
 
@@ -278,25 +278,25 @@ Figure~\ref{fig:sample_efficiency} quantifies these scaling behaviors as a group
     \label{fig:sample_efficiency}
 \end{figure}
 
-\subsection{Why DQN Dominates: Mechanism Analysis}
+\subsection{Mechanism Analysis of DQN Performance}
 
-Readers familiar with modern deep RL may expect PPO or SAC to outperform DQN: both carry entropy or trust-region guarantees that DQN lacks, and both have demonstrated superior performance on complex continuous control tasks. The 2048 results invert this expectation. Four structural mechanisms explain why.
+In many continuous control benchmarks, PPO and SAC outperform DQN due to entropy regularization and trust-region guarantees. On 2048, however, DQN achieves the highest score across all evaluation tiers. We identify four structural properties of the 2048 domain that favor DQN's design.
 
 \textbf{Experience replay as a sparse-reward amplifier.}
-On-policy methods (PPO, A2C) see each trajectory exactly once before discarding it. DQN's 100K-transition replay buffer~\cite{mnih2015human} means a rare 1024-tile trajectory is revisited repeatedly. At 5M steps with batch size 64 and a 100K buffer, the expected replay count per transition is $(5\text{M} \times 64) / 100\text{K} \approx 3{,}200$. This is not a marginal advantage: it is a $3{,}200\times$ amplification of the sparse reward signal that on-policy methods process exactly once~(S\&B~\S8.2).
+On-policy methods (PPO, A2C) use each trajectory exactly once before discarding it. DQN's 100K-transition replay buffer~\cite{mnih2015human} enables repeated updates on rare high-scoring trajectories. At 5M steps with batch size 64 and a 100K buffer, the expected replay count per transition is $(5\text{M} \times 64) / 100\text{K} \approx 3{,}200$. This constitutes a $3{,}200\times$ amplification of the sparse reward signal relative to on-policy methods, which process each transition exactly once~(S\&B~\S8.2).
 
 \textbf{Target network stability on exponential reward scales.}
 DQN's frozen target network~\cite{mnih2015human} prevents moving-target instability. On 2048's exponentially growing tile values, successive Q-value estimates can differ by orders of magnitude as the policy improves. A synchronized (non-frozen) target would induce oscillation precisely at the high-value transitions most critical for learning.
 
-\textbf{Why SAC's entropy bonus backfires.}
-SAC's automatic temperature tuning~\cite{haarnoja2018soft} targets entropy $0.4 \cdot \log|\mathcal{A}| \approx 0.55$~nats. On 2048, the vast majority of board states yield low reward regardless of action. Maintaining high entropy encourages uniform action selection over low-value states, wasting update capacity precisely when greedy exploitation of the few high-value trajectories drives score improvement.
+\textbf{Entropy regularization in sparse-reward settings.}
+SAC's automatic temperature tuning~\cite{haarnoja2018soft} targets entropy $0.4 \cdot \log|\mathcal{A}| \approx 0.55$~nats. In 2048, the majority of board states yield low reward regardless of action. Maintaining high entropy promotes uniform action selection over these low-value states, diverting update capacity away from the greedy exploitation of the few high-value trajectories that drive score improvement.
 
-\textbf{Why PPO's clipping caps rare-event learning.}
-PPO's $\epsilon{=}0.2$ clip~\cite{schulman2017proximal} was designed for smooth reward surfaces. On 2048, a single merge of two 1024 tiles yields 1024 reward units while hundreds of preceding moves yield nothing. The clipping that prevents destructive updates in well-behaved environments also caps the gradient steps needed to propagate value from rare, high-scoring merges back through the trajectory, starving the policy of the signal it most needs.
+\textbf{Clipping constraints under heavy-tailed rewards.}
+PPO's $\epsilon{=}0.2$ clip~\cite{schulman2017proximal} bounds the magnitude of policy updates per iteration. In 2048, a single merge of two 1024-tiles yields 1024 reward units while hundreds of preceding moves yield negligible reward. The same clipping that prevents destructive updates under smooth reward surfaces also limits the gradient magnitude needed to propagate value from these rare, high-reward merges back through the trajectory.
 
 \subsection{DQN Analysis}
 
-Given DQN's dominant performance, we examine its training dynamics in detail. Figure~\ref{fig:dqn_training} shows the joint evolution of average score and maximum tile achieved (in $\log_2$ scale) over 5M training steps. Both metrics improve monotonically, with score growth accelerating after approximately 2M steps as the agent learns to chain high-value merges. The $\log_2$ tile metric reveals that DQN consistently reaches tile 512 ($2^9$) after 1M steps and tile 1024 ($2^{10}$) after 3M steps, with sporadic 2048 ($2^{11}$) games appearing in the final million steps.
+Figure~\ref{fig:dqn_training} shows the joint evolution of DQN's average score and maximum tile achieved (in $\log_2$ scale) over 5M training steps. Both metrics improve monotonically, with score growth accelerating after approximately 2M steps as the agent learns to chain high-value merges. The $\log_2$ tile metric indicates that DQN consistently reaches tile 512 ($2^9$) after 1M steps and tile 1024 ($2^{10}$) after 3M steps, with sporadic 2048 ($2^{11}$) episodes appearing in the final million steps.
 
 \begin{figure}[t]
     \centering
@@ -305,9 +305,9 @@ Given DQN's dominant performance, we examine its training dynamics in detail. Fi
     \label{fig:dqn_training}
 \end{figure}
 
-\subsection{DQN vs. QR-DQN: Why Distributional RL Fails}
+\subsection{DQN vs. QR-DQN: Distributional RL Comparison}
 
-A natural hypothesis is that QR-DQN's richer distributional signal~\cite{dabney2018distributional} should improve upon DQN's scalar Q-estimates. Figure~\ref{fig:dqn_qrdqn} shows that this hypothesis fails decisively on 2048.
+QR-DQN models the full return distribution via quantile regression~\cite{dabney2018distributional}, providing a richer learning signal than DQN's scalar Q-estimates. Despite this theoretical advantage, QR-DQN underperforms DQN on 2048, as shown in Figure~\ref{fig:dqn_qrdqn}.
 
 \begin{figure}[t]
     \centering
@@ -316,7 +316,7 @@ A natural hypothesis is that QR-DQN's richer distributional signal~\cite{dabney2
     \label{fig:dqn_qrdqn}
 \end{figure}
 
-DQN's score increases monotonically, reaching an average of 7,744 at 5M steps. QR-DQN plateaus near 1,000 despite its theoretically richer representation. We attribute this to two factors. First, the $4{\times}50{=}200$-dimensional output head introduces significant variance in gradient estimates relative to DQN's compact 4-dimensional output. Second, the quantile Huber loss~\cite{dabney2018distributional} penalizes all quantile crossings equally, but 2048's return distribution is heavy-tailed: a small number of games produce scores 10--40$\times$ the median, and these outlier games are precisely the trajectories from which the agent must learn. QR-DQN dampens these signals by distributing them across 50 quantiles.
+DQN's score increases monotonically to an average of 7,744 at 5M steps, while QR-DQN plateaus near 1,000. Two factors may account for this gap. First, the $4{\times}50{=}200$-dimensional output head introduces higher variance in gradient estimates relative to DQN's compact 4-dimensional output. Second, the quantile Huber loss~\cite{dabney2018distributional} penalizes all quantile crossings equally; however, 2048's return distribution is heavy-tailed, with a small number of episodes producing scores 10--40$\times$ the median. These outlier episodes contain the most informative learning signal, and distributing them across 50 quantiles attenuates their gradient contribution.
 
 \subsection{On-Policy Degradation}
 
@@ -325,7 +325,7 @@ Figure~\ref{fig:degradation} isolates the training curves of PPO and QR-DQN to h
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{fig_onpolicy_degradation.png}
-    \caption{Training curves for PPO and QR-DQN over 5M steps. PPO peaks near 1M steps and subsequently degrades ($-$8\%). QR-DQN shows modest improvement (+28\%) but remains far below DQN. This is a cautionary finding for PPO: longer on-policy training can actively hurt performance on 2048.}
+    \caption{Training curves for PPO and QR-DQN over 5M steps. PPO peaks near 1M steps and subsequently degrades ($-$8\%). QR-DQN shows modest improvement (+28\%) but remains substantially below DQN.}
     \label{fig:degradation}
 \end{figure}
 
@@ -361,13 +361,13 @@ PPO    & 193   & 64   & 520    & Collapses early \\
     \label{fig:hunt}
 \end{figure}
 
-DQN is the only agent to reach tile 2048, requiring 3,902 attempts (0.026\% success rate). Hunt mode exposes a subtle failure mode: deterministic greedy policies create infinite loops at board states where Q-values are poorly estimated. Adding 5\% exploration breaks these cycles by occasionally selecting suboptimal but cycle-breaking actions. PPO's catastrophic collapse to tile 64 in just 193 attempts (worse than uniform random play) demonstrates that its on-policy training has produced a policy that overfits to a narrow trajectory distribution incompatible with the stochastic exploration used in hunt mode.
+DQN is the only agent to reach tile 2048, requiring 3,902 attempts (0.026\% success rate). Hunt mode reveals that deterministic greedy policies can enter infinite loops at board states where Q-values are poorly estimated; the 5\% exploration probability breaks these cycles by occasionally selecting alternative actions. PPO reaches only tile 64 within 193 attempts, a result below uniform random play, indicating that its on-policy training produced a policy narrowly specialized to the trajectory distribution seen during training and unable to generalize under stochastic action selection.
 
 \subsection{RLVR Results: GRPO-Trained LLMs}
 
 \subsubsection{What GRPO Is and How It Was Applied.}
 
-Group Relative Policy Optimization~\cite{shao2024deepseekmath} is a critic-free policy gradient method originally developed for mathematical reasoning. Rather than maintaining a separate value network to estimate baselines, GRPO generates a \emph{group} of $G$ completions for each prompt and normalizes advantages relative to that group's reward distribution (Eq.~\ref{eq:grpo_adv}). This makes GRPO particularly attractive for fine-tuning on a student-grade GPU: eliminating the critic halves peak memory consumption compared to standard actor-critic methods.
+Group Relative Policy Optimization~\cite{shao2024deepseekmath} is a critic-free policy gradient method originally developed for mathematical reasoning. Rather than maintaining a separate value network to estimate baselines, GRPO generates a \emph{group} of $G$ completions for each prompt and normalizes advantages relative to that group's reward distribution (Eq.~\ref{eq:grpo_adv}). Eliminating the critic reduces peak memory consumption compared to standard actor-critic methods, enabling fine-tuning on consumer-grade GPUs with limited VRAM.
 
 In this work, GRPO is applied to a fundamentally different domain: spatial strategy in 2048. Each training ``prompt'' consists of an ASCII-rendered board state, and the model must output a structured XML response containing a chain-of-thought reasoning trace followed by a directional action. The verifiable reward comes directly from the game environment, avoiding any reliance on a reward model or human feedback.
 
@@ -507,7 +507,7 @@ We presented a systematic comparison of six classical RL agents and two GRPO-tra
 
     \item \textbf{Features beat deep networks at low data.} Semi-gradient SARSA with 120 hand-crafted parameters outperforms all deep on-policy agents (330K+ parameters), validating Sutton \& Barto's guidance~(\S9.5) that domain-specific features can provide stronger inductive bias than CNNs learning from scratch under sparse-reward conditions; however, this advantage depends on expert knowledge of the domain, which is not freely available in novel environments.
 
-    \item \textbf{More training can hurt on-policy agents.} PPO loses 8\% score from 1M$\to$5M steps, developing degenerate move loops. This is a cautionary finding for practitioners: longer training does not universally help.
+    \item \textbf{Extended training can degrade on-policy agents.} PPO loses 8\% score from 1M$\to$5M steps, developing degenerate move loops. This result indicates that longer training does not universally improve performance on sparse-reward tasks.
 
     \item \textbf{LLM scale drives RLVR performance.} preliminary evidence from two model scales ($3\times$ parameters $\to$ $3.3\times$ higher score) suggests spatial reasoning benefits from model capacity; GRPO uniquely produces interpretable per-move rationale, but spatial reasoning remains a bottleneck at small scales.
 \end{enumerate}
