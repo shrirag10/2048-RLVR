@@ -18,6 +18,8 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 | 4 | **LLM scale drives RLVR performance** | 3× parameters (0.5B→1.5B) yields 3.3× score improvement (704→2,348) |
 | 5 | **DQN is the only agent to reach tile 2048** | In hunt mode (unlimited stochastic attempts), DQN reaches 2048 on attempt 3,902 |
 
+![Average Score Comparison: All Agents](assets/fig_classical_vs_rlvr.png)
+
 ---
 
 ## Results
@@ -33,12 +35,16 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 | QR-DQN | SB3-Contrib | 1,003 | 4,508 | 512 | 0% | +28% |
 | PPO | SB3 (Maskable) | 957 | 4,900 | 512 | 0% | −8% |
 
+![Sample Efficiency: 1M vs 5M](assets/fig_sample_efficiency.png)
+
 ### GRPO-Trained LLMs — 500 Training Steps over 2,000 Prompts
 
 | Model | Avg Score | Max Tile | Params | ms/move | Training Time |
 | ------- | --------- | -------- | ------ | ------- | ------------- |
 | **Qwen2.5-1.5B** | **2,348** | **256** | 1.8B | ~1,500 | ~76 min |
 | Qwen2.5-0.5B | 704 | 64 | 494M | ~1,500 | ~41 min |
+
+![GRPO Scaling: 0.5B vs 1.5B](assets/fig_grpo_scaling.png)
 
 ### Hunt Mode — 1M Checkpoint, ε=0.05, Unlimited Attempts
 
@@ -49,6 +55,8 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 | A2C | 3,000 | 512 | 7,844 |
 | SAC | 3,000 | 256 | 3,648 |
 | PPO | 193 | 64 | 520 |
+
+![Hunt Mode Performance](assets/fig_hunt_mode.png)
 
 ---
 
@@ -245,11 +253,11 @@ python -m src.classical.hunt_2048 --agents dqn lfa  # subset
 python serve.py          # http://localhost:8080
 ```
 
-| Dashboard View | Description |
-| ---------------- | ----------- |
-| **Play 2048** | Interactive game with undo, score tracking |
-| **Benchmark** | Score convergence charts, comparative metrics |
-| **Agent Playback** | Step-by-step replay with move-probability bars |
+| Dashboard View | Description | Screenshot |
+| ---------------- | ----------- | ---------- |
+| **Play 2048** | Interactive game with undo, score tracking | <img src="assets/dashboard_play.png" width="300"/> |
+| **Benchmark** | Score convergence charts, comparative metrics | <img src="assets/dashboard_benchmark.png" width="300"/> |
+| **Agent Playback** | Step-by-step replay with move-probability bars | <img src="assets/dashboard_playback.png" width="300"/> |
 
 ### 7. Run Tests
 
