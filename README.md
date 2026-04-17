@@ -11,7 +11,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 ## Key Findings
 
 | # | Finding | Evidence |
-|---|---------|----------|
+| --- | ------- | -------- |
 | 1 | **Off-policy replay is decisive** | DQN (7,744 avg) outperforms on-policy PPO (957 avg) by 8× on identical architectures |
 | 2 | **Hand-crafted features beat deep on-policy networks** | Semi-gradient SARSA with 120 parameters outperforms all deep on-policy agents (330K+ params) |
 | 3 | **More training can hurt on-policy agents** | PPO loses 8% score from 1M→5M steps, developing degenerate move loops |
@@ -25,7 +25,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 ### Classical Agents — 5M Training Steps (single seed)
 
 | Agent | Impl. | Avg Score | Max Score | Max Tile | 512+ Rate | 1M→5M Δ |
-|-------|-------|-----------|-----------|----------|-----------|----------|
+| ------- | ----- | --------- | --------- | -------- | --------- | -------- |
 | **DQN** | Custom PyTorch | **7,744** | **39,314** | **2048** | **76%** | +21% |
 | SARSA | Custom NumPy | 2,456 | 11,436 | 1024 | 6% | <1% |
 | A2C | SB3 | 1,964 | 9,640 | 1024 | 6% | +63% |
@@ -36,14 +36,14 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 ### GRPO-Trained LLMs — 500 Training Steps over 2,000 Prompts
 
 | Model | Avg Score | Max Tile | Params | ms/move | Training Time |
-|-------|-----------|----------|--------|---------|---------------|
+| ------- | --------- | -------- | ------ | ------- | ------------- |
 | **Qwen2.5-1.5B** | **2,348** | **256** | 1.8B | ~1,500 | ~76 min |
 | Qwen2.5-0.5B | 704 | 64 | 494M | ~1,500 | ~41 min |
 
 ### Hunt Mode — 1M Checkpoint, ε=0.05, Unlimited Attempts
 
 | Agent | Attempts | Best Tile | Best Score |
-|-------|----------|-----------|------------|
+| ------- | -------- | --------- | ---------- |
 | **DQN** | 3,902 | **2048** | **21,572** |
 | SARSA | 3,000 | 1024 | 12,300 |
 | A2C | 3,000 | 512 | 7,844 |
@@ -136,7 +136,7 @@ Conv2D(16→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → Conv2D(
 **Semi-gradient SARSA** — Sutton & Barto Algorithm 10.1 with 30-dimensional hand-crafted features:
 
 | Features (30 total) | Dim | Description |
-|---------------------|-----|-------------|
+| --------------------- | --- | ----------- |
 | Log-tile values | 16 | `log₂(B[i,j]+1)/16` for each cell |
 | Empty ratio | 1 | Fraction of empty cells |
 | Merge potential | 1 | Count of adjacent equal pairs, normalized |
@@ -163,7 +163,7 @@ Weight matrix: `w ∈ ℝ^{4×30}` = 120 parameters. Step-size α=1e-3, ε-decay
 **Training Pipeline:** Qwen2.5-Instruct models fine-tuned via GRPO (Group Relative Policy Optimization) using 4-bit NF4 quantization via Unsloth + LoRA (r=16, α=16).
 
 | Parameter | 0.5B Model | 1.5B Model |
-|-----------|------------|------------|
+| --------- | ---------- | ---------- |
 | Base model | Qwen2.5-0.5B-Instruct | Qwen2.5-1.5B-Instruct |
 | Parameters | 494M | 1.8B |
 | Dataset | 2,000 board-state prompts | 2,000 board-state prompts |
@@ -178,6 +178,7 @@ Weight matrix: `w ∈ ℝ^{4×30}` = 120 parameters. Step-size α=1e-3, ε-decay
 **Why Local GRPO, Not an LLM API?** GRPO requires per-token log-probabilities and their gradients for the clipped policy update — commercial APIs don't expose model weights or gradient computation. Local deployment also ensures deterministic training under fixed seeds.
 
 **Reward Schedule (3-stage curriculum):**
+
 1. Steps 0–100: Format compliance only (XML tag structure, weight 0.5)
 2. Steps 100–200: + Direction validity (weight 0.5)
 3. Steps 200–500: + Game reward (Δscore/max_tile, weight 2.0)
@@ -245,7 +246,7 @@ python serve.py          # http://localhost:8080
 ```
 
 | Dashboard View | Description |
-|----------------|-------------|
+| ---------------- | ----------- |
 | **Play 2048** | Interactive game with undo, score tracking |
 | **Benchmark** | Score convergence charts, comparative metrics |
 | **Agent Playback** | Step-by-step replay with move-probability bars |
@@ -261,7 +262,7 @@ python -m pytest tests/ -v
 ## Hardware
 
 | Resource | Specification |
-|----------|---------------|
+| ---------- | --------------- |
 | **GPU** | NVIDIA RTX 4060 Laptop (8 GB VRAM) |
 | **GRPO VRAM** | ~4–6 GB (0.5B/1.5B model, QLoRA 4-bit, G=4) |
 | **Python** | 3.10+ |
