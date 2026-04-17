@@ -26,17 +26,16 @@
 \title{Solving 2048: A Comparative Study of\\Classical Reinforcement Learning and LLM-Guided RLVR}
 
 \author{
-Shriman Raghav \quad Gautham Ramkumar \\
-MS Robotics, Khoury College of Computer Sciences \\
-Northeastern University, Boston, MA \\
-\texttt{srinivasan.shrim@northeastern.edu}
+Shriman Raghav Srinivasan \quad Gautham Ramkumar \\
+MS Robotics, Northeastern University, Boston, MA \\
+\texttt{srinivasan.shrim@northeastern.edu} \quad \texttt{ramkumar.g@northeastern.edu}
 }
 
 \maketitle
 
 %%====================================================================
 \begin{abstract}
-We present a systematic comparison of classical reinforcement learning and Reinforcement Learning with Verifiable Rewards (RLVR) on the 2048 puzzle game. Six classical agents -- Deep Q-Network (DQN), Proximal Policy Optimization (PPO), Advantage Actor-Critic (A2C), Quantile Regression DQN (QR-DQN), discrete Soft Actor-Critic (SAC), and Semi-gradient SARSA with linear function approximation -- are benchmarked against Qwen2.5 language models (0.5B and 1.5B parameters) fine-tuned via Group Relative Policy Optimization (GRPO). All deep classical agents share an identical three-layer CNN backbone (330K parameters) to isolate algorithmic effects. We evaluate at three levels: 1M training steps, 5M training steps, and unlimited-attempt hunt mode. DQN achieves the highest classical score (avg 7,744 at 5M steps; tile 2048 in hunt mode), while Semi-gradient SARSA with only 120 parameters outperforms all deep on-policy methods, validating Sutton \& Barto's thesis that engineered features trump raw network capacity when data is scarce. GRPO-trained LLMs demonstrate a clear model-scale dependence ($3\times$ parameters $\to$ $3.3\times$ score), but classical agents remain $\sim$400$\times$ faster at inference. We release a live dashboard and complete codebase for reproducibility.
+We present a systematic comparison of classical reinforcement learning and Reinforcement Learning with Verifiable Rewards (RLVR) on the 2048 puzzle game. Six classical agents (Deep Q-Network [DQN], Proximal Policy Optimization [PPO], Advantage Actor-Critic [A2C], Quantile Regression DQN [QR-DQN], discrete Soft Actor-Critic [SAC], and Semi-gradient SARSA with linear function approximation) are benchmarked against Qwen2.5 language models (0.5B and 1.5B parameters) fine-tuned via Group Relative Policy Optimization (GRPO). All deep classical agents share an identical three-layer CNN backbone (330K parameters) to isolate algorithmic effects. We evaluate at three levels: 1M training steps, 5M training steps, and unlimited-attempt hunt mode. DQN achieves the highest classical score (avg 7,744 at 5M steps; tile 2048 in hunt mode), while Semi-gradient SARSA with only 120 parameters outperforms all deep on-policy methods, demonstrating that hand-crafted domain features can outperform end-to-end CNN learning under sparse-reward conditions. GRPO-trained LLMs reach avg 2,348 (Qwen2.5-1.5B) vs.\ DQN's 7,744, show model-scale dependence ($3\times$ parameters $\to$ $3.3\times$ score), but classical agents remain $\sim$400$\times$ faster at inference. We release a live dashboard and complete codebase for reproducibility.
 \end{abstract}
 
 %%====================================================================
@@ -47,7 +46,7 @@ The tile-sliding puzzle 2048 was introduced in 2014 by Gabriele Cirulli and quic
 
 Despite its compact $4{\times}4$ board, 2048 poses fundamental challenges for learning agents. The state space is vast (${\sim}10^{19}$ configurations), rewards are sparse and delayed (hundreds of preparatory moves may earn nothing before a single high-value merge), and stochastic tile spawns make planning difficult. These properties make 2048 an ideal benchmark for comparing fundamentally different learning paradigms.
 
-Recently, a new paradigm has emerged: Reinforcement Learning with Verifiable Rewards (RLVR). Instead of training a neural network policy via environment interaction, RLVR fine-tunes large language models (LLMs) to generate chain-of-thought reasoning validated by deterministic reward functions~\cite{guo2025deepseek, wen2025rlvr}. While RLVR has yielded breakthroughs in mathematical reasoning, its application to spatial strategy games remains largely unexplored.
+Recently, a new paradigm has emerged: Reinforcement Learning with Verifiable Rewards (RLVR). Instead of training a neural network policy via environment interaction, RLVR fine-tunes large language models (LLMs) to generate chain-of-thought reasoning validated by deterministic reward functions~\cite{guo2025deepseek, wen2025rlvr}. While RLVR has yielded breakthroughs in mathematical reasoning, its application to spatial strategy games remains largely unexplored: symbolic math operates over linear token sequences, while grid games require models to maintain consistent 2D spatial relationships across positional labels, a distinct and harder generalization target.
 
 This paper asks three questions: \textbf{(Q1)}~How do six classical RL algorithms compare on 2048 when architectural confounds are removed? \textbf{(Q2)}~Can small LLMs (0.5B--1.5B parameters) acquire 2048 strategy through GRPO alone, without using proprietary LLM APIs? \textbf{(Q3)}~What are the fundamental trade-offs between classical RL's throughput and RLVR's interpretability?
 
@@ -56,8 +55,7 @@ Our contributions include:
     \item A controlled benchmark of six classical agents and two GRPO-LLM agents on a unified 2048 environment with clear 1M/5M/hunt-mode evaluation tiers.
     \item Demonstration that Semi-gradient SARSA (Sutton \& Barto, Algorithm~10.1~\cite{sutton2018rl}) with 120 parameters outperforms all deep on-policy methods with 330K+ parameters.
     \item A GRPO training pipeline for locally deployed LLMs with analysis of model-scale dependence and spatial reasoning failures.
-    \item Evidence that on-policy methods (PPO, A2C) actively degrade with extended training on 2048, losing 9--12\% score from 1M to 5M steps.
-    \item A live web dashboard for step-by-step replay visualization.
+    \item Evidence that on-policy PPO actively degrades with extended training on 2048, losing 8\% score from 1M to 5M steps.
 \end{enumerate}
 
 %%====================================================================
@@ -71,8 +69,8 @@ The 2048 game is modeled as a finite-horizon MDP $(\mathcal{S}, \mathcal{A}, P, 
     \item $\mathcal{S}$: Board states, encoded as 16-channel binary tensors $\mathbf{x}\in\{0,1\}^{16\times4\times4}$ for CNN agents, or ASCII text for LLM agents.
     \item $\mathcal{A} = \{\text{UP}, \text{RIGHT}, \text{DOWN}, \text{LEFT}\}$: Four discrete actions.
     \item $P(s'|s,a)$: Deterministic tile-sliding with stochastic spawn (90\% tile-2, 10\% tile-4 at random empty cell).
-    \item $R(s,a,s')$: Score-delta plus milestone bonuses (+50 at 256, +100 at 512, +200 at 1024) and $-1$ penalty for invalid moves.
-    \item $\gamma = 0.99$: Discount factor.
+    \item $R(s,a,s')$: Score-delta plus milestone bonuses (+50 at 256, +100 at 512, +200 at 1024) and $-1$ penalty for invalid moves (directions that produce no tile movement).
+    \item $\gamma = 0.99$: Discount factor. For games that can exceed 500 moves, the effective planning horizon ($\sim$100 steps) truncates the influence of terminal rewards, making reward shaping via milestone bonuses essential.
 \end{itemize}
 
 \subsection{Value-Based Methods}
@@ -101,7 +99,7 @@ This replaces the critic's state-dependent baseline with a sample-based, prompt-
 \label{sec:related}
 
 \textbf{Classical approaches to 2048.}
-Szubert \& Ja\'skowski~\cite{szubert2014temporal} use temporal-difference learning with n-tuple networks, achieving strong performance via tabular value approximation over board patterns. Saligram et al.~\cite{saligram2025delayed} apply DQN with delayed-reward shaping. Our work differs by comparing six algorithms on a shared backbone, isolating the learning algorithm from architectural choices.
+Szubert \& Ja\'skowski~\cite{szubert2014temporal} use temporal-difference learning with n-tuple networks, achieving tile 65536 via tabular value approximation over hand-designed board patterns. Saligram et al.~\cite{saligram2025delayed} apply DQN with delayed-reward shaping. We exclude expert-designed tabular methods such as n-tuple TD from our baselines because our focus is on general-purpose deep RL algorithms that require no 2048-specific representation design; Semi-gradient SARSA with 30 engineered features serves as our closest proxy.
 
 \textbf{Deep RL for games.}
 Mnih et al.~\cite{mnih2015human} demonstrated human-level Atari play with DQN. Subsequent work introduced distributional RL~\cite{dabney2018distributional}, entropy-regularized policies~\cite{haarnoja2018soft}, and trust-region methods~\cite{schulman2017proximal}. We evaluate all four paradigms on a single game with matched architectures.
@@ -147,7 +145,7 @@ Hyperparameters: replay buffer 200K, batch size 256, Polyak $\tau=0.005$, learni
 
 We use SB3's MaskablePPO~\cite{raffin2021stable}, which natively supports action masking via environment-provided masks.
 
-Hyperparameters: rollout 2048 steps $\times$ 8 parallel envs, batch size 64, 10 epochs per update, learning rate $3{\times}10^{-4}$, GAE $\lambda=0.95$, clip $\epsilon=0.2$, entropy coefficient $c_e=0.01$.
+Hyperparameters: rollout 512 steps $\times$ 8 parallel envs, batch size 128, 4 epochs per update, learning rate $2{\times}10^{-4}$, $\gamma{=}0.995$, clip $\epsilon=0.2$, entropy coefficient $c_e=0.05$.
 
 \subsubsection{A2C (Stable-Baselines3).}
 
@@ -168,7 +166,7 @@ Following Sutton \& Barto, Algorithm~10.1~\cite{sutton2018rl}, we implement epis
     \hat{q}(s,a,\mathbf{w}) = \mathbf{w}_a^\top \phi(s)
 \end{equation}
 
-The feature vector $\phi(s)$ encodes 30 dimensions following Sutton \& Barto's guidance on feature construction~(\S9.5): 16 log-tile values, empty ratio, merge potential, 4 monotonicity scores, max-tile indicator, corner bonus, 3 tile distribution statistics, smoothness, snake-pattern score, and edge-tile sum. The semi-gradient update rule~(\S10.1) differentiates only through the prediction:
+The feature vector $\phi(s) \in \mathbb{R}^{30}$ encodes: 16 log-tile values $\log_2(B_{ij}+1)/16$, empty-cell ratio $|E|/16$, merge potential (count of adjacent equal pairs, normalized), 4 monotonicity scores (one per row/column direction, $\sum |\log_2 B_i - \log_2 B_{i+1}|$), max-tile indicator $\log_2(\max B)/16$, corner-max bonus $\mathbb{1}[\max B \in \text{corners}]$, mean/std/max of log-tile values, smoothness $-\sum |\log_2 B_i - \log_2 B_j|$ over adjacent pairs, snake-pattern score (monotonic zigzag through cells), and edge-tile sum $\sum_{(i,j) \in \partial} \log_2 B_{ij}$. Features are normalized to $[0,1]$ via division by their theoretical maxima. The semi-gradient update rule~(\S10.1) differentiates only through the prediction:
 \begin{equation}
     \mathbf{w}_{a_t} \leftarrow \mathbf{w}_{a_t} + \alpha \delta_t \phi(s_t), \quad \delta_t = r_t + \gamma \hat{q}(s_{t+1}, a_{t+1}) - \hat{q}(s_t, a_t)
 \end{equation}
@@ -178,18 +176,11 @@ Hyperparameters: step-size $\alpha=10^{-3}$, $\varepsilon$-decay 0.99995/step, $
 \subsection{GRPO-Trained LLM Agent}
 
 \subsubsection{Why Local GRPO, Not an LLM API?}
-
-We train LLMs locally via GRPO rather than using proprietary APIs (e.g., OpenAI, Anthropic) for three reasons:
-
-\begin{enumerate}
-    \item \textbf{Policy gradient access.} GRPO requires computing per-token log-probabilities $\log\pi_\theta(o_{i,t}|q, o_{i,<t})$ and their gradients to form the importance ratio $r_t^i(\theta) = \pi_\theta / \pi_{\theta_{\text{old}}}$. Commercial APIs do not expose model weights or gradient computation; only logit/log-prob outputs are sometimes available, which is insufficient for the clipped PPO-style policy update.
-    \item \textbf{Cost.} GRPO generates $G{=}4$ completions per prompt across 300 training steps, totaling $\sim$1,200 forward passes per epoch. At API pricing (\$0.10--\$1.00 per 1K tokens), this training loop would cost \$100--\$500 per experiment, making iterative hyperparameter tuning infeasible on a student budget.
-    \item \textbf{Reproducibility.} Local deployment with fixed random seeds and quantization settings ensures deterministic training. API-served models may change versions silently, undermining reproducibility.
-\end{enumerate}
+Commercial LLM APIs do not expose the per-token log-probabilities or gradient computations required for GRPO's clipped policy update. Local deployment additionally ensures deterministic training under fixed seeds and avoids silent model-version changes that would undermine reproducibility.
 
 \subsubsection{Model and Training.}
 
-We fine-tune Qwen2.5-0.5B-Instruct (494M params) and Qwen2.5-1.5B-Instruct (1.8B params)~\cite{qwen2024} using 4-bit NF4 quantization via Unsloth~\cite{unsloth2024} with LoRA adapters ($r{=}32$, $\alpha{=}32$). The GRPO loss follows Equation~\ref{eq:grpo_adv} with a KL penalty:
+We fine-tune Qwen2.5-0.5B-Instruct (494M params) and Qwen2.5-1.5B-Instruct (1.8B params)~\cite{qwen2024} using 4-bit NF4 quantization via Unsloth~\cite{unsloth2024} with LoRA adapters ($r{=}16$, $\alpha{=}16$). The GRPO loss follows Equation~\ref{eq:grpo_adv} with a KL penalty:
 \begin{equation}
     \mathcal{L}_{\text{GRPO}}(\theta) = \mathbb{E}_q\!\left[\frac{1}{G}\sum_{i=1}^G \frac{1}{|o_i|}\sum_{t=1}^{|o_i|}\!\left(L_t^{\text{clip}} - \beta D_{\text{KL}}\right)\right]
 \end{equation}
@@ -205,7 +196,11 @@ The reward function uses three stages to avoid cold-start collapse: (1)~format c
 
 \subsection{Setup}
 
-All experiments ran on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM), Ubuntu 22.04, CUDA 12.6. Classical agents were trained for 1M and 5M environment steps. LLM agents (Qwen2.5-0.5B and 1.5B) were trained for 300 GRPO prompts (${\sim}$12 hours). Agents were additionally evaluated in ``hunt mode'': unlimited stochastic episodes ($\varepsilon{=}0.05$) using the 1M-step checkpoint until reaching tile 2048 or exhausting 3,000 attempts.
+All experiments ran on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM), Ubuntu 22.04, CUDA 12.6. LLM agents (Qwen2.5-0.5B and 1.5B) were trained for 500 GRPO steps over a dataset of 2,000 board-state prompts for 3 epochs (0.5B: $\sim$41 minutes; 1.5B: $\sim$76 minutes). Classical agents were additionally evaluated in ``hunt mode'': unlimited stochastic episodes ($\varepsilon{=}0.05$) using the 1M-step checkpoint until reaching tile 2048 or exhausting 3,000 attempts.
+
+\paragraph{Training Step Accounting.} All classical agents were trained for 5M total environment interactions. DQN uses a single environment ($n_{\text{envs}}{=}1$); SB3-based agents (PPO, A2C, QR-DQN, SAC) use 8 parallel environments, but SB3's \texttt{total\_timesteps} parameter counts total interactions across all environments, so 5M steps equals 5M interactions for all agents. The asymmetry lies in gradient updates: DQN performs one gradient step per interaction (up to 5M updates), while PPO with rollout length 512 and 8 environments performs one batch update per $512{\times}8{=}4{,}096$ interactions ($\sim$1,220 updates over 5M steps). Off-policy replay thus provides both more gradient updates and the ability to revisit past transitions.
+
+\paragraph{Statistical caveat.} All reported scores are point estimates from a single training run per agent, averaged over the final 100 training episodes. Multi-seed evaluation was not feasible within the project timeline. Large gaps (DQN vs.\ PPO, $>7{,}000$ score points) are almost certainly robust; smaller gaps (A2C vs.\ SAC, within 700 score points) should be interpreted as suggestive rather than definitive.
 
 \subsection{Classical RL Results: 1M Steps}
 
@@ -213,7 +208,7 @@ Table~\ref{tab:1m_results} presents all six classical agents evaluated over thei
 
 \begin{table}[t]
 \centering
-\caption{Classical Agent Performance (Last 100 Episodes, 1M Steps)}
+\caption{Classical agent performance at the 1M-step checkpoint, evaluated over the last 100 training episodes. DQN dominates across all metrics. Semi-gradient SARSA achieves second place with $2{,}750\times$ fewer parameters.}
 \label{tab:1m_results}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}l r r r r r r l@{}}
@@ -233,17 +228,26 @@ QR-DQN        & 782   & 2,176  & 256  & 2\%  & 0\% & 0\% & SB3 \\
 }
 \end{table}
 
-DQN dominates at 1M steps, reaching tile 1024 in 10\% of games. The $8\times$ gap over PPO (6,384 vs.\ 1,038) is driven by experience replay: DQN's 100K buffer revisits rare high-scoring trajectories thousands of times, amplifying sparse reward signals~(S\&B \S8.2). On-policy methods discard each trajectory after a single update.
+DQN dominates at 1M steps, reaching tile 1024 in 10\% of games. The $8\times$ gap over PPO (6,384 vs.\ 1,038) is attributable to experience replay: DQN's 100K-transition buffer enables repeated updates on rare high-scoring trajectories, amplifying sparse reward signals~(S\&B \S8.2). On-policy methods discard each trajectory after a single update, making them fundamentally sample-inefficient in reward-sparse environments.
 
-Semi-gradient SARSA achieves second place (avg 2,455, max tile 1024) with only 120 parameters -- $2{,}750\times$ fewer than DQN's 330K. Its hand-crafted feature vector encodes monotonicity, corner strategies, merge potential, and snake patterns, providing the ``strong inductive bias'' that Sutton \& Barto advocate~(\S9.5).
+Semi-gradient SARSA achieves second place (avg 2,455, max tile 1024) with only 120 parameters ($2{,}750\times$ fewer than DQN's 330K). Its hand-crafted feature vector encodes monotonicity, corner strategies, merge potential, and snake patterns, providing the ``strong inductive bias'' that Sutton \& Barto advocate~(\S9.5).
+
+Figure~\ref{fig:all_learning} presents the learning curves for all six agents over the full 5M-step training horizon, illustrating the divergence in scaling behavior that emerges after the 1M checkpoint.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_all_agents_learning.png}
+    \caption{Smoothed learning curves for all six classical agents over 5M training steps. DQN exhibits monotonic improvement throughout, while PPO and QR-DQN plateau and subsequently degrade after approximately 1M steps. The dashed vertical line marks the 1M checkpoint used for hunt-mode evaluation.}
+    \label{fig:all_learning}
+\end{figure}
 
 \subsection{Classical RL Results: 5M Steps}
 
-Table~\ref{tab:5m_results} shows the same agents at the 5M-step checkpoint.
+Table~\ref{tab:5m_results} shows the same agents at the 5M-step checkpoint. The 1M$\to$5M scaling analysis reveals three distinct behavioral regimes.
 
 \begin{table}[t]
 \centering
-\caption{Classical Agent Performance (5M Steps)}
+\caption{Classical agent performance at 5M training steps. The $\Delta$ column shows the percentage change in average score from the 1M checkpoint (Table~\ref{tab:1m_results}). DQN is the only agent exhibiting strong positive scaling.}
 \label{tab:5m_results}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}l r r r r r r@{}}
@@ -252,31 +256,88 @@ Table~\ref{tab:5m_results} shows the same agents at the 5M-step checkpoint.
                & \textbf{Score} & \textbf{Score} & \textbf{Tile} & \textbf{Rate} & \textbf{$\Delta$} & \\
 \midrule
 \rowcolor{dqncolor!10}
-DQN     & \textbf{7,744} & \textbf{39,314} & \textbf{2048} & \textbf{76\%} & \color{dqncolor}{\textbf{+174\%}} & Strong scaling \\
-SARSA   & 2,456 & 11,436 & 1024 & 6\%   & +7\%   & Ceiling (\S9.4) \\
-A2C     & 1,944 & 9,640  & 1024 & 6\%   & +56\%  & Modest gain \\
-SAC     & 1,255 & 7,882  & 512  & $<$1\% & +79\% & Slow \\
-QR-DQN  & 995   & 5,176  & 512  & $<$1\% & \color{red}{$-$9\%}  & Degrading \\
-PPO     & 962   & 4,900  & 512  & $<$1\% & \color{red}{$-$12\%} & Gets worse \\
+DQN     & \textbf{7,744} & \textbf{39,314} & \textbf{2048} & \textbf{76\%} & \color{dqncolor}{\textbf{+21\%}} & Strong scaling \\
+SARSA   & 2,456 & 11,436 & 1024 & 6\%   & $<$1\%   & Ceiling (\S9.4) \\
+A2C     & 1,964 & 9,640  & 1024 & 6\%   & +63\%  & Modest gain \\
+SAC     & 1,255 & 7,882  & 512  & $<$1\% & +11\% & Slow \\
+QR-DQN  & 1,003 & 4,508  & 512  & 0\%   & +28\%  & Modest gain \\
+PPO     & 957   & 4,900  & 512  & 0\%   & \color{red}{$-$8\%} & Gets worse \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-The 1M$\to$5M scaling analysis reveals three distinct behaviors:
-\begin{itemize}
-    \item \textbf{DQN scales strongly} (+174\%), confirming that off-policy replay continues to benefit from more data accumulation.
-    \item \textbf{SARSA reaches its representational ceiling} (+7\%), consistent with the bounded approximation error under linear FA~(S\&B~\S9.4). The 120-parameter linear model cannot capture the complex tile interactions needed for tiles beyond 1024.
-    \item \textbf{PPO and QR-DQN actively degrade} ($-$12\% and $-$9\% respectively). PPO develops degenerate tile-sliding loops; QR-DQN suffers from distributional overfitting with its 200-dimensional output head.
-\end{itemize}
+\textbf{DQN scales strongly} (+21\%), confirming that off-policy replay continues to benefit from additional data accumulation. The replay buffer acts as a reservoir of high-scoring trajectories that are revisited thousands of times, a mechanism unavailable to on-policy methods. \textbf{SARSA reaches its representational ceiling} ($<$1\% gain), consistent with the bounded approximation error under linear function approximation~(S\&B~\S9.4). The 120-parameter linear model cannot represent the complex tile interactions required for merges beyond 1024. \textbf{PPO degrades} ($-$8\%), developing degenerate tile-sliding loops where the policy repeatedly selects the same two directions. A2C shows the strongest relative improvement (+63\%), suggesting that the simpler actor-critic update is more stable than PPO's clipped objective on this task.
+
+Figure~\ref{fig:sample_efficiency} quantifies these scaling behaviors as a grouped bar chart, making the divergence between off-policy and on-policy methods visually apparent.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_sample_efficiency.png}
+    \caption{Sample efficiency comparison: average score at 1M vs.\ 5M training steps. Percentage labels indicate the change from the 1M checkpoint. DQN benefits most from additional training; PPO and QR-DQN degrade.}
+    \label{fig:sample_efficiency}
+\end{figure}
+
+\subsection{Why DQN Dominates: Mechanism Analysis}
+
+Readers familiar with modern deep RL may expect PPO or SAC to outperform DQN: both carry entropy or trust-region guarantees that DQN lacks, and both have demonstrated superior performance on complex continuous control tasks. The 2048 results invert this expectation. Four structural mechanisms explain why.
+
+\textbf{Experience replay as a sparse-reward amplifier.}
+On-policy methods (PPO, A2C) see each trajectory exactly once before discarding it. DQN's 100K-transition replay buffer~\cite{mnih2015human} means a rare 1024-tile trajectory is revisited repeatedly. At 5M steps with batch size 64 and a 100K buffer, the expected replay count per transition is $(5\text{M} \times 64) / 100\text{K} \approx 3{,}200$. This is not a marginal advantage: it is a $3{,}200\times$ amplification of the sparse reward signal that on-policy methods process exactly once~(S\&B~\S8.2).
+
+\textbf{Target network stability on exponential reward scales.}
+DQN's frozen target network~\cite{mnih2015human} prevents moving-target instability. On 2048's exponentially growing tile values, successive Q-value estimates can differ by orders of magnitude as the policy improves. A synchronized (non-frozen) target would induce oscillation precisely at the high-value transitions most critical for learning.
+
+\textbf{Why SAC's entropy bonus backfires.}
+SAC's automatic temperature tuning~\cite{haarnoja2018soft} targets entropy $0.4 \cdot \log|\mathcal{A}| \approx 0.55$~nats. On 2048, the vast majority of board states yield low reward regardless of action. Maintaining high entropy encourages uniform action selection over low-value states, wasting update capacity precisely when greedy exploitation of the few high-value trajectories drives score improvement.
+
+\textbf{Why PPO's clipping caps rare-event learning.}
+PPO's $\epsilon{=}0.2$ clip~\cite{schulman2017proximal} was designed for smooth reward surfaces. On 2048, a single merge of two 1024 tiles yields 1024 reward units while hundreds of preceding moves yield nothing. The clipping that prevents destructive updates in well-behaved environments also caps the gradient steps needed to propagate value from rare, high-scoring merges back through the trajectory, starving the policy of the signal it most needs.
+
+\subsection{DQN Analysis}
+
+Given DQN's dominant performance, we examine its training dynamics in detail. Figure~\ref{fig:dqn_training} shows the joint evolution of average score and maximum tile achieved (in $\log_2$ scale) over 5M training steps. Both metrics improve monotonically, with score growth accelerating after approximately 2M steps as the agent learns to chain high-value merges. The $\log_2$ tile metric reveals that DQN consistently reaches tile 512 ($2^9$) after 1M steps and tile 1024 ($2^{10}$) after 3M steps, with sporadic 2048 ($2^{11}$) games appearing in the final million steps.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_dqn_training.png}
+    \caption{DQN training dynamics over 5M steps. The left axis shows smoothed score (orange); the right axis shows the maximum tile achieved per episode in $\log_2$ scale (blue dashes). Both metrics exhibit steady improvement, with the score growth rate increasing after 2M steps.}
+    \label{fig:dqn_training}
+\end{figure}
+
+\subsection{DQN vs. QR-DQN: Why Distributional RL Fails}
+
+A natural hypothesis is that QR-DQN's richer distributional signal~\cite{dabney2018distributional} should improve upon DQN's scalar Q-estimates. Figure~\ref{fig:dqn_qrdqn} shows that this hypothesis fails decisively on 2048.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_dqn_vs_qrdqn.png}
+    \caption{Head-to-head comparison of DQN and QR-DQN learning curves over 5M training steps. Despite modeling the full return distribution, QR-DQN plateaus below 1,500 while DQN improves monotonically. Shaded bands indicate $\pm$25\% of the smoothed score.}
+    \label{fig:dqn_qrdqn}
+\end{figure}
+
+DQN's score increases monotonically, reaching an average of 7,744 at 5M steps. QR-DQN plateaus near 1,000 despite its theoretically richer representation. We attribute this to two factors. First, the $4{\times}50{=}200$-dimensional output head introduces significant variance in gradient estimates relative to DQN's compact 4-dimensional output. Second, the quantile Huber loss~\cite{dabney2018distributional} penalizes all quantile crossings equally, but 2048's return distribution is heavy-tailed: a small number of games produce scores 10--40$\times$ the median, and these outlier games are precisely the trajectories from which the agent must learn. QR-DQN dampens these signals by distributing them across 50 quantiles.
+
+\subsection{On-Policy Degradation}
+
+Figure~\ref{fig:degradation} isolates the training curves of PPO and QR-DQN to highlight their contrasting behaviors from the 1M checkpoint onward.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_onpolicy_degradation.png}
+    \caption{Training curves for PPO and QR-DQN over 5M steps. PPO peaks near 1M steps and subsequently degrades ($-$8\%). QR-DQN shows modest improvement (+28\%) but remains far below DQN. This is a cautionary finding for PPO: longer on-policy training can actively hurt performance on 2048.}
+    \label{fig:degradation}
+\end{figure}
+
+PPO's degradation is attributable to the interaction between its clipped objective and 2048's non-stationary reward landscape. Early in training, the policy visits diverse board states; the clipping mechanism preserves this diversity. As training continues, the policy converges to a narrow trajectory distribution, and the clipped updates reinforce these trajectories rather than exploring alternatives. Without a replay buffer to maintain trajectory diversity, the policy collapses to degenerate looping behavior.
 
 \subsection{Hunt Mode (1M Checkpoint, Unlimited Attempts)}
 
-Each agent plays with stochastic action selection ($\varepsilon{=}0.05$) using its 1M-step checkpoint until reaching tile 2048 or exhausting 3,000 attempts.
+Each agent plays with stochastic action selection ($\varepsilon{=}0.05$) using its 1M-step checkpoint until reaching tile 2048 or exhausting 3,000 attempts. Table~\ref{tab:hunt_results} and Figure~\ref{fig:hunt} present the results.
 
 \begin{table}[t]
 \centering
-\caption{Hunt Mode Results (1M Checkpoint, Unlimited Attempts)}
+\caption{Hunt mode results using the 1M checkpoint with $\varepsilon{=}0.05$ exploration. DQN is the only agent to reach tile 2048; PPO collapses in under 200 attempts.}
 \label{tab:hunt_results}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}l r r r l@{}}
@@ -293,17 +354,34 @@ PPO    & 193   & 64   & 520    & Collapses early \\
 \end{tabular}}
 \end{table}
 
-DQN is the only agent to reach tile 2048 (attempt 3,902 of unlimited play, 0.026\% rate). Hunt mode reveals that deterministic greedy policies create infinite cycles at board states where Q-values are poorly estimated; adding 5\% exploration breaks these cycles. Semi-gradient SARSA's linear capacity ceiling~(\S9.4) prevents it from representing the complex tile interactions needed for the 1024$\to$2048 merge.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig_hunt_mode.png}
+    \caption{Hunt mode: number of attempts used (horizontal axis) and best tile achieved (labels) per agent. The dotted line marks the 3,000-attempt budget. DQN exceeded the budget but reached tile 2048; PPO collapsed in 193 attempts. QR-DQN is excluded as hunt mode was not run for this agent.}
+    \label{fig:hunt}
+\end{figure}
 
-PPO collapses to tile 64 in just 193 attempts -- worse than random play -- demonstrating that its policy has catastrophically overfit to a narrow set of states seen during 1M-step on-policy training.
+DQN is the only agent to reach tile 2048, requiring 3,902 attempts (0.026\% success rate). Hunt mode exposes a subtle failure mode: deterministic greedy policies create infinite loops at board states where Q-values are poorly estimated. Adding 5\% exploration breaks these cycles by occasionally selecting suboptimal but cycle-breaking actions. PPO's catastrophic collapse to tile 64 in just 193 attempts (worse than uniform random play) demonstrates that its on-policy training has produced a policy that overfits to a narrow trajectory distribution incompatible with the stochastic exploration used in hunt mode.
 
 \subsection{RLVR Results: GRPO-Trained LLMs}
+
+\subsubsection{What GRPO Is and How It Was Applied.}
+
+Group Relative Policy Optimization~\cite{shao2024deepseekmath} is a critic-free policy gradient method originally developed for mathematical reasoning. Rather than maintaining a separate value network to estimate baselines, GRPO generates a \emph{group} of $G$ completions for each prompt and normalizes advantages relative to that group's reward distribution (Eq.~\ref{eq:grpo_adv}). This makes GRPO particularly attractive for fine-tuning on a student-grade GPU: eliminating the critic halves peak memory consumption compared to standard actor-critic methods.
+
+In this work, GRPO is applied to a fundamentally different domain: spatial strategy in 2048. Each training ``prompt'' consists of an ASCII-rendered board state, and the model must output a structured XML response containing a chain-of-thought reasoning trace followed by a directional action. The verifiable reward comes directly from the game environment, avoiding any reliance on a reward model or human feedback.
+
+We fine-tune two Qwen2.5-Instruct models: a 0.5B and a 1.5B variant. Both are loaded in 4-bit NF4 quantization via Unsloth~\cite{unsloth2024} with LoRA adapters ($r{=}16$, $\alpha{=}16$), keeping memory usage below 6\,GB VRAM. Training runs for 500 GRPO optimizer steps over a dataset of 2,000 board-state prompts for 3 epochs, generating $G{=}4$ completions per prompt. Total training time is approximately 41 minutes (0.5B) and 76 minutes (1.5B) on an RTX 4060 Laptop GPU.
+
+\subsubsection{Reward Schedule and Cold-Start Mitigation.}
+
+A na\"ive game-reward-only objective causes cold-start collapse: the model fails to produce parseable output and receives all-zero rewards, causing the policy to diverge immediately. We use a three-stage curriculum. Stage~1 (steps 0--100) rewards only format compliance (XML tag structure, weight~0.5). Stage~2 (steps 100--200) adds a direction validity reward (weight~0.5), penalizing moves outside \{UP, DOWN, LEFT, RIGHT\}. Stage~3 (steps 200--300) introduces the game reward ($\Delta$score / max\_tile, weight~2.0). Length and quality bonus terms were removed after the model learned to reward-hack them by generating filler tokens between the thinking and answer tags.
 
 Table~\ref{tab:grpo_results} compares the two GRPO-trained LLM agents.
 
 \begin{table}[t]
 \centering
-\caption{GRPO-Trained LLM Performance (300 Prompts)}
+\caption{GRPO-trained LLM performance after 500 training steps over 2,000 prompts. The $3\times$ increase in model parameters yields a $3.3\times$ score improvement.}
 \label{tab:grpo_results}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}l r r r r@{}}
@@ -317,37 +395,70 @@ Qwen2.5-0.5B & 704 & 64 & 494M & 1,500 \\
 \end{tabular}}
 \end{table}
 
-The $3\times$ parameter increase (0.5B $\to$ 1.5B) yields a $3.3\times$ score improvement (704 $\to$ 2,348), indicating that model scale is the primary lever for RLVR on spatial tasks. Figure~\ref{fig:grpo_scaling} shows this scaling relationship.
+The $3\times$ parameter increase (0.5B $\to$ 1.5B) yields a $3.3\times$ score improvement (704 $\to$ 2,348), as shown in Figure~\ref{fig:grpo_scaling}. While only two data points prevent strong claims about the functional form of this relationship, the magnitude of the gain suggests that model capacity is a primary lever for RLVR on spatial tasks.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{fig_grpo_scaling.png}
-    \caption{GRPO scaling: $3\times$ parameters $\to$ $3.3\times$ score.}
+    \includegraphics[width=0.75\columnwidth]{fig_grpo_scaling.png}
+    \caption{GRPO scaling: $3\times$ more parameters (0.5B $\to$ 1.5B) yield a $3.3\times$ improvement in average score. Only two data points are available; the functional form of this relationship remains to be established with additional model sizes.}
     \label{fig:grpo_scaling}
 \end{figure}
 
-\textbf{Chain-of-thought reasoning.} The 1.5B model produces interpretable move explanations. For example, given a board with 256 anchored in the bottom-right corner:
+\subsubsection{Training Dynamics.}
+
+Figure~\ref{fig:grpo_dynamics} decomposes the GRPO training process into three diagnostic panels. Panel~(a) shows the total reward trajectory for both models over the logged 500 optimizer steps. The 1.5B model achieves consistently higher cumulative reward and substantially lower variance across the group of $G{=}4$ completions. High within-group reward variance produces noisy advantage estimates (Eq.~\ref{eq:grpo_adv}), degrading gradient quality, so this difference is mechanistically important.
+
+Panel~(b) separates the format and direction reward components. Both models learn format compliance (generating syntactically valid XML tags) within approximately 50 training steps, confirming that instruction-tuned base models carry strong structural priors. However, the 0.5B model takes nearly three times as many steps to achieve consistent direction validity, indicating that its capacity is barely sufficient to simultaneously maintain format structure and reason about spatial moves.
+
+Panel~(c) shows the KL divergence from the reference policy on a logarithmic scale. The 0.5B model exhibits order-of-magnitude larger KL spikes in the first 100 steps. Large KL spikes indicate that GRPO is forcing aggressive policy updates because the base model is poorly initialized for this task at this scale. The KL penalty ($\beta{=}0.04$ in Eq.~\ref{eq:grpo_adv}) prevents divergence but constrains policy shift per step, imposing a capacity tax on the smaller model.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig_grpo_training_dynamics.png}
+    \caption{GRPO training dynamics for the 0.5B and 1.5B models across 500 optimizer steps. (a)~Total reward: 1.5B converges higher with lower within-group variance. (b)~Format and direction reward: format compliance is learned quickly by both models, but valid direction prediction is significantly slower for 0.5B. (c)~KL divergence (log scale): 0.5B exhibits order-of-magnitude larger policy deviations early in training, reflecting capacity-constrained optimization.}
+    \label{fig:grpo_dynamics}
+\end{figure*}
+
+\subsubsection{Critical Analysis of GRPO on Spatial Tasks.}
+
+Several structural limitations of GRPO become apparent when applied outside its original mathematical reasoning domain.
+
+\textbf{Token-space vs.\ state-space reasoning.} GRPO optimizes token-level log-probabilities, but spatial reasoning requires consistent modeling of a $4{\times}4$ grid where position relationships are not preserved in token order. The ASCII encoding forces the model to learn board geometry implicitly from positional labels ([row][col]), a fundamentally different inductive bias than the convolutional structure exploited by classical agents.
+
+\textbf{Data efficiency.} Five hundred training steps with $G{=}4$ completions each expose the model to approximately 2,000 board states. In contrast, DQN processes 5M transitions with a 100K-transition replay buffer, revisiting each state many times. This $2{,}500\times$ sample ratio is the primary quantitative explanation for the $3.3\times$ score gap between GRPO 1.5B (2,348) and DQN (7,744).
+
+\textbf{Reward hacking.} The length and quality bonus terms were exploited by the 0.5B model, which generated verbose filler text between the \texttt{<think>} and \texttt{<answer>} tags to maximize sequence-length rewards without improving game performance. This is a canonical RLVR failure mode.
+
+\textbf{Scalability outlook.} The 3.3$\times$ score gain from a 3$\times$ parameter increase is encouraging, but both models are limited to tile 256. Reaching tile 2048 via GRPO would likely require models in the 7B--13B range with longer training horizons, hardware unavailable in this study.
+
+\subsubsection{Chain-of-Thought Reasoning.}
+
+The 1.5B model produces interpretable move explanations during interactive evaluation. For example, given a board with 256 anchored in the bottom-right corner, we observed the following output:
 
 \begin{quote}
 \small\texttt{<think> 256 anchored bottom-right -- good. Gradient: 128, 64, 32, 16 intact along right/bottom edges. RIGHT merges 4+4 in row~1 (+8). Avoids scattering corner tile. </think> <answer>RIGHT</answer>}
 \end{quote}
 
-\textbf{Spatial reasoning failure.} The 0.5B model reveals a fundamental limitation: it pattern-matches on token proximity rather than grid geometry. When tiles 4 appear at positions [0][1] and [1][0], the model incorrectly claims ``4 at [0][1] and [1][0] are adjacent -- LEFT merges them into 8.'' In reality, they are in different rows; LEFT moves each to column 0 independently with no merge. This spatial failure explains the 0.5B model's poor performance and suggests that larger models are needed for accurate mental simulation of board mechanics.
+This reasoning trace mirrors the snake-pattern heuristic used in classical agents: anchor the highest tile in a corner and build a monotonic gradient outward. That the model generates this strategy from 500 training steps on 2,000 prompts is notable.
+
+\subsubsection{Spatial Reasoning Failure.}
+
+The 0.5B model reveals a fundamental limitation observed during interactive evaluation: it pattern-matches on token proximity rather than grid geometry. When tiles 4 appear at positions [0][1] and [1][0], the model incorrectly claims ``4 at [0][1] and [1][0] are adjacent; LEFT merges them into 8.'' In reality, they are in different rows; LEFT moves each to column 0 independently with no merge. This type of spatial reasoning failure, where the model confuses token adjacency in the serialized representation with spatial adjacency on the board, is a qualitative observation from interactive testing. A systematic categorization of failure modes across a larger sample would strengthen this finding and is left for future work.
 
 \subsection{Classical RL vs. RLVR Comparison}
 
-Figure~\ref{fig:classical_vs_rlvr} directly compares all eight agents. Table~\ref{tab:head_to_head} provides a dimension-by-dimension comparison.
+Figure~\ref{fig:classical_vs_rlvr} directly compares all eight agents. Table~\ref{tab:head_to_head} provides a dimension-by-dimension analysis.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{fig_classical_vs_rlvr.png}
-    \caption{Classical RL vs.\ RLVR: average score comparison across 1M steps, 5M steps, and GRPO training (300 prompts).}
+    \caption{Average score comparison across all eight agents. Classical agents are shown with solid fills; GRPO-LLM agents are outlined. DQN at 5M steps achieves the highest score (7,744), while GRPO 1.5B (2,348) outperforms three of the five deep classical agents.}
     \label{fig:classical_vs_rlvr}
 \end{figure}
 
 \begin{table}[t]
 \centering
-\caption{Head-to-Head: Classical RL vs.\ LLM-RLVR}
+\caption{Head-to-head comparison across seven dimensions. Classical RL dominates on performance and efficiency; RLVR provides unique interpretability through chain-of-thought reasoning.}
 \label{tab:head_to_head}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{@{}l l l@{}}
@@ -358,8 +469,8 @@ Best Avg Score   & \textbf{7,744} (DQN, 5M)      & 2,348 (1.5B) \\
 Best Max Tile    & \textbf{2048} (DQN, hunt)       & 256 (1.5B) \\
 Parameters       & 120 -- 430K                     & 494M -- 1.8B \\
 Inference        & \textbf{$<$4\,ms/move}          & 1,500\,ms/move \\
-Training data    & 5M env steps ($\sim$2 hrs)       & 300 prompts ($\sim$12 hrs) \\
-Training compute & 2 hrs (RTX 4060)                & 12 hrs (same GPU) \\
+Training data    & 5M env steps ($\sim$2 hrs)       & 2,000 prompts ($\sim$76 min) \\
+Training compute & $\sim$2 hrs (RTX 4060)            & $\sim$76 min (same GPU) \\
 Interpretable    & No (black box)                  & \textbf{Yes (chain-of-thought)} \\
 Observation      & \textbf{Tensor} (16ch)          & ASCII text \\
 Action space     & Integer $\{0{-}3\}$             & Natural language token \\
@@ -368,42 +479,37 @@ Action space     & Integer $\{0{-}3\}$             & Natural language token \\
 }
 \end{table}
 
-The $3.3\times$ score gap between the best classical agent (DQN, 7,744) and the best RLVR agent (GRPO 1.5B, 2,348) reflects fundamental differences in data efficiency and representation. DQN processes 5M transitions with replay, revisiting each state thousands of times; GRPO sees only $300{\times}4{=}1{,}200$ board states. DQN's 16-channel tensor encoding is information-dense; the LLM must tokenize and parse ASCII text, introducing representational overhead.
+The $3.3\times$ score gap between DQN (7,744) and GRPO 1.5B (2,348) reflects fundamental differences in data efficiency and representation. DQN processes 5M transitions with replay, revisiting each state thousands of times; GRPO sees approximately 2,000 board states. DQN's 16-channel tensor encoding is information-dense, preserving the spatial structure of the board in a form amenable to convolutional processing; the LLM must tokenize and parse ASCII text, introducing representational overhead that scales with sequence length.
 
-However, RLVR provides a unique advantage: \emph{interpretability}. Every GRPO move includes a chain-of-thought explanation that can be inspected, debugged, and corrected. Classical agents are complete black boxes. In applications where explainability is valued -- educational tools, human-AI collaboration, safety-critical systems -- the 400$\times$ latency penalty may be acceptable.
+However, RLVR provides a unique advantage: \emph{interpretability}. Every GRPO move includes a chain-of-thought explanation that can be inspected, debugged, and corrected. Classical agents are complete black boxes. In applications where explainability is valued (educational tools, human-AI collaboration, safety-critical systems), the 400$\times$ latency penalty may be acceptable.
 
-\subsection{Training Dynamics}
+\subsection{Parameter Efficiency}
 
-Figure~\ref{fig:dqn_curves} shows DQN's training curves over 5M steps, demonstrating steady improvement throughout. Figure~\ref{fig:sample_efficiency} compares the scaling behavior from 1M to 5M steps across all classical agents.
+Figure~\ref{fig:param_efficiency} plots average score against parameter count on a logarithmic scale, revealing the non-monotonic relationship between model size and performance.
 
-\begin{figure}[t]
+\begin{figure*}[t]
     \centering
-    \includegraphics[width=\columnwidth]{fig_dqn_5m.png}
-    \caption{DQN training curves over 5M steps. Score and max tile improve steadily, reaching 2048 tile and avg 7,744.}
-    \label{fig:dqn_curves}
-\end{figure}
+    \includegraphics[width=0.7\textwidth]{fig_param_efficiency.png}
+    \caption{Parameter efficiency: average score vs.\ model size (log scale). Semi-gradient SARSA (120 parameters) outperforms four agents with $2{,}750\times$ more parameters, and both GRPO-LLM agents with $4{,}000{,}000\times$ more parameters. DQN's 330K parameters achieve the best absolute performance. The LLM agents occupy the upper-right quadrant, trading parameter efficiency for interpretability.}
+    \label{fig:param_efficiency}
+\end{figure*}
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth]{fig_sample_efficiency.png}
-    \caption{Sample efficiency: 1M vs.\ 5M steps. DQN benefits most (+174\%); PPO and QR-DQN degrade ($-$12\%, $-$9\%).}
-    \label{fig:sample_efficiency}
-\end{figure}
+Semi-gradient SARSA's position (120 parameters, score 2,456) represents the most parameter-efficient configuration in our study. It outperforms four deep agents with $2{,}750\times$ more parameters and both GRPO-LLM agents with approximately $4{,}000{,}000\times$ more parameters. This demonstrates that domain knowledge encoded in hand-crafted features can outperform end-to-end learning from raw observations when the feature space is well-designed for the task (S\&B~\S9.5). However, this advantage depends on expert knowledge of the domain, and SARSA's representational ceiling (the bounded approximation error of linear FA described in \S9.4) prevents it from reaching DQN's performance, which requires the nonlinear function approximation of neural networks.
 
 %%====================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented a systematic comparison of six classical RL agents and two GRPO-trained LLMs on the 2048 puzzle. Our controlled setup -- shared CNN backbone, identical environment, three evaluation tiers (1M, 5M, hunt mode) -- isolates algorithmic effects and yields four key findings:
+We presented a systematic comparison of six classical RL agents and two GRPO-trained LLMs on the 2048 puzzle. Our controlled setup (shared CNN backbone, identical environment, three evaluation tiers: 1M, 5M, hunt mode) isolates algorithmic effects and yields four key findings:
 
 \begin{enumerate}
-    \item \textbf{Off-policy replay is decisive.} DQN's 100K replay buffer (S\&B~\S8.2) produces an $8\times$ advantage over on-policy PPO on identical architectures (7,744 vs.\ 962). Experience replay amplifies sparse rewards that on-policy methods see exactly once and discard.
+    \item \textbf{Off-policy replay is decisive.} DQN's 100K replay buffer (S\&B~\S8.2) produces an $8\times$ advantage over on-policy PPO on identical architectures (7,744 vs.\ 957). Experience replay amplifies sparse rewards that on-policy methods see exactly once and discard.
 
-    \item \textbf{Features beat deep networks at low data.} Semi-gradient SARSA with 120 hand-crafted parameters outperforms all deep on-policy agents (330K+ parameters), validating Sutton \& Barto's thesis~(\S9.5) that domain-specific features provide stronger inductive bias than CNNs learning from scratch.
+    \item \textbf{Features beat deep networks at low data.} Semi-gradient SARSA with 120 hand-crafted parameters outperforms all deep on-policy agents (330K+ parameters), validating Sutton \& Barto's guidance~(\S9.5) that domain-specific features can provide stronger inductive bias than CNNs learning from scratch under sparse-reward conditions; however, this advantage depends on expert knowledge of the domain, which is not freely available in novel environments.
 
-    \item \textbf{More training actively hurts on-policy agents.} PPO and QR-DQN lose 9--12\% score from 1M$\to$5M steps, developing degenerate move loops. This is a cautionary finding for practitioners: longer training does not universally help.
+    \item \textbf{More training can hurt on-policy agents.} PPO loses 8\% score from 1M$\to$5M steps, developing degenerate move loops. This is a cautionary finding for practitioners: longer training does not universally help.
 
-    \item \textbf{LLM scale drives RLVR performance.} $3\times$ more parameters (0.5B $\to$ 1.5B) yields $3.3\times$ higher score. GRPO uniquely produces interpretable per-move rationale, but spatial reasoning remains a bottleneck at small model scales.
+    \item \textbf{LLM scale drives RLVR performance.} preliminary evidence from two model scales ($3\times$ parameters $\to$ $3.3\times$ higher score) suggests spatial reasoning benefits from model capacity; GRPO uniquely produces interpretable per-move rationale, but spatial reasoning remains a bottleneck at small scales.
 \end{enumerate}
 
 Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU, replay buffer ablation (10K--500K) to quantify the exact contribution of replay to DQN's dominance, multi-seed evaluation for statistical significance, and hybrid LLM-MCTS approaches combining interpretability with search efficiency.
@@ -411,7 +517,7 @@ Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU, replay buffer
 %%====================================================================
 \section*{Acknowledgment}
 
-This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at the Khoury College of Computer Sciences, Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM).
+This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM).
 
 %%====================================================================
 \begin{thebibliography}{00}
