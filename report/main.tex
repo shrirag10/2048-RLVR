@@ -11,7 +11,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{subcaption}
-\usepackage{hyperref}
+\usepackage{url}
 \usepackage{cite}
 \usepackage{multirow}
 \usepackage{array}
@@ -111,7 +111,7 @@ Hu et al.~\cite{hu2025lmgame} benchmark LLMs on diverse games including 2048, fi
 DeepSeek-R1~\cite{guo2025deepseek} showed that GRPO can incentivize reasoning in LLMs using verifiable rewards. DeepSeekMath~\cite{shao2024deepseekmath} applied GRPO to mathematical reasoning. We extend RLVR to spatial strategy games and quantify the gap between RLVR and classical approaches.
 
 %%====================================================================
-\section{Project Description}
+\section{Methodology}
 \label{sec:method}
 
 \subsection{Environment}
@@ -261,7 +261,7 @@ SARSA   & 2,456 & 11,436 & 1024 & 6\%   & $<$1\%   & Convergence \\
 A2C     & 1,964 & 9,640  & 1024 & 6\%   & +63\%  & Modest gain \\
 SAC     & 1,255 & 7,882  & 512  & $<$1\% & +11\% & Slow \\
 QR-DQN  & 1,003 & 4,508  & 512  & 0\%   & +28\%  & Modest gain \\
-PPO     & 957   & 4,900  & 512  & 0\%   & \color{red}{$-$8\%} & Degradation \\
+PPO     & 957   & 4,900  & 512  & 0\%   & \textbf{$-$8\%} & Degradation \\
 \bottomrule
 \end{tabular}
 }
@@ -520,62 +520,7 @@ Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU, replay buffer
 This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM).
 
 %%====================================================================
-\begin{thebibliography}{00}
-
-\bibitem{guo2025deepseek}
-D.~Guo \textit{et al.}, ``DeepSeek-R1: Incentivizing reasoning capability in LLMs via reinforcement learning,'' \textit{Nature}, vol.~645, pp.~633--638, 2025.
-
-\bibitem{wen2025rlvr}
-Y.~Wen \textit{et al.}, ``RLVR implicitly incentivizes correct reasoning,'' \textit{arXiv:2506.14245}, 2025.
-
-\bibitem{saligram2025delayed}
-P.~Saligram, T.~Bhathal, and R.~Manihani, ``2048: Reinforcement learning in a delayed reward environment,'' \textit{arXiv:2507.05465}, 2025.
-
-\bibitem{hu2025lmgame}
-L.~Hu \textit{et al.}, ``lmgame-Bench: How good are LLMs at playing games?'' \textit{arXiv:2505.15146}, 2025.
-
-\bibitem{mnih2015human}
-V.~Mnih \textit{et al.}, ``Human-level control through deep reinforcement learning,'' \textit{Nature}, vol.~518, no.~7540, pp.~529--533, 2015.
-
-\bibitem{schulman2017proximal}
-J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Klimov, ``Proximal policy optimization algorithms,'' \textit{arXiv:1707.06347}, 2017.
-
-\bibitem{mnih2016asynchronous}
-V.~Mnih \textit{et al.}, ``Asynchronous methods for deep reinforcement learning,'' in \textit{Proc.\ ICML}, pp.~1928--1937, 2016.
-
-\bibitem{dabney2018distributional}
-W.~Dabney, M.~Rowland, M.~Bellemare, and R.~Munos, ``Distributional reinforcement learning with quantile regression,'' in \textit{Proc.\ AAAI}, 2018.
-
-\bibitem{haarnoja2018soft}
-T.~Haarnoja, A.~Zhou, P.~Abbeel, and S.~Levine, ``Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor,'' in \textit{Proc.\ ICML}, 2018.
-
-\bibitem{christodoulou2019soft}
-P.~Christodoulou, ``Soft actor-critic for discrete action settings,'' \textit{arXiv:1910.07207}, 2019.
-
-\bibitem{dettmers2024qlora}
-T.~Dettmers, A.~Pagnoni, A.~Holtzman, and L.~Zettlemoyer, ``QLoRA: Efficient finetuning of quantized language models,'' in \textit{Proc.\ NeurIPS}, 2024.
-
-\bibitem{shao2024deepseekmath}
-Z.~Shao \textit{et al.}, ``DeepSeekMath: Pushing the limits of mathematical reasoning in open language models,'' \textit{arXiv:2402.03300}, 2024.
-
-\bibitem{szubert2014temporal}
-M.~Szubert and W.~Ja\'{s}kowski, ``Temporal difference learning of n-tuple networks for the game 2048,'' in \textit{Proc.\ IEEE CIG}, 2014.
-
-\bibitem{raffin2021stable}
-A.~Raffin \textit{et al.}, ``Stable-Baselines3: Reliable reinforcement learning implementations,'' \textit{J.\ Mach.\ Learn.\ Res.}, vol.~22, no.~268, pp.~1--8, 2021.
-
-\bibitem{qwen2024}
-Qwen Team, ``Qwen2.5: A party of foundation models,'' \textit{arXiv:2412.15115}, 2024.
-
-\bibitem{unsloth2024}
-D.~Han and M.~Han, ``Unsloth,'' Available: \url{https://github.com/unslothai/unsloth}, 2024.
-
-\bibitem{towers2024gymnasium}
-M.~Towers \textit{et al.}, ``Gymnasium: A standard interface for reinforcement learning environments,'' \textit{arXiv:2407.17032}, 2024.
-
-\bibitem{sutton2018rl}
-R.~S.~Sutton and A.~G.~Barto, \textit{Reinforcement Learning: An Introduction}, 2nd~ed. Cambridge, MA: MIT Press, 2018.
-
-\end{thebibliography}
+\bibliographystyle{unsrt}
+\bibliography{references}
 
 \end{document}
