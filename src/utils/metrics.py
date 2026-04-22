@@ -10,13 +10,17 @@ from __future__ import annotations
 import csv
 import os
 import time
+import warnings
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
 
-import matplotlib
-matplotlib.use("Agg")  # Non-interactive backend
-import matplotlib.pyplot as plt
+# Suppress the duplicate-matplotlib-installation Axes3D warning
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message="Unable to import Axes3D")
+    import matplotlib
+    matplotlib.use("Agg")  # Non-interactive backend
+    import matplotlib.pyplot as plt
 import numpy as np
 
 

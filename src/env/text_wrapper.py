@@ -243,12 +243,13 @@ def generate_board_states(
         List of dicts with 'board', 'score', 'max_tile', 'system_prompt', 'user_prompt'.
     """
     if stage_distribution is None:
-        stage_distribution = {"early": 0.3, "mid": 0.4, "late": 0.3}
+        # late (>512) is nearly impossible with random play — skip it
+        stage_distribution = {"early": 0.4, "mid": 0.6, "late": 0.0}
 
     rng = np.random.default_rng(seed)
     states = []
     text_game = TextGame2048()
-    max_attempts = n * 10  # Prevent infinite loops
+    max_attempts = n * 50  # late-stage states are rare with random play
     attempts = 0
 
     stage_counts = {
@@ -269,8 +270,7 @@ def generate_board_states(
         game_seed = int(rng.integers(0, 2**31))
         text_game.reset(seed=game_seed)
 
-        # Play random moves to reach various game stages
-        num_moves = int(rng.integers(1, 200))
+        num_moves = int(rng.integers(1, 300))
         for _ in range(num_moves):
             valid = text_game.game.get_valid_actions()
             if not valid:

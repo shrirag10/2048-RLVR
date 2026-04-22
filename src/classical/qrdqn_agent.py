@@ -128,18 +128,20 @@ def train_qrdqn(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/qrdqn",
-    reward_mode: str = "score_delta",
+    reward_mode: str = "score_delta",              # match DQN — distributional RL works best with simple rewards
     seed: int = 42,
-    lr: float = 1e-4,
-    buffer_size: int = 100_000,
-    batch_size: int = 64,
-    gamma: float = 0.99,
-    exploration_fraction: float = 0.2,
-    exploration_final_eps: float = 0.01,
-    n_quantiles: int = 50,
-    target_update_interval: int = 1000,
-    train_freq: int = 4,
-    learning_starts: int = 5000,
+    lr: float = 6.3e-5,                            # slightly lower than DQN — distributional needs stability
+    buffer_size: int = 500_000,                     # bigger buffer for off-policy data diversity
+    batch_size: int = 128,                          # larger batch for better quantile gradient estimates
+    gamma: float = 0.99,                            # match DQN — 0.995 was too high
+    exploration_fraction: float = 0.4,              # explore longer — 40% of total steps
+    exploration_final_eps: float = 0.02,            # slightly higher floor than DQN
+    n_quantiles: int = 200,                         # more quantiles = finer return distribution
+    target_update_interval: int = 1000,             # less frequent target sync for stability
+    train_freq: int = 4,                            # train every 4 steps — less aggressive
+    learning_starts: int = 20_000,                  # collect more diverse initial data
+    gradient_steps: int = 1,
+    n_envs: int = 8,
     device: str = "auto",
 ) -> QRDQN:
     """
@@ -153,11 +155,22 @@ def train_qrdqn(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+    import src.env.gym_wrapper  # ensure registration in subprocesses
+
+    vec_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    env = make_vec_env(
+        "Game2048-v0",
+        n_envs=n_envs,
+        env_kwargs={"reward_mode": reward_mode},
+        vec_env_cls=vec_cls,
+        seed=seed,
+    )
 
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
-        "features_extractor_kwargs": {"features_dim": 256},
+        "features_extractor_kwargs": {"features_dim": 512},  # bigger extractor
         "n_quantiles": n_quantiles,
     }
 
@@ -172,6 +185,7 @@ def train_qrdqn(
         exploration_final_eps=exploration_final_eps,
         target_update_interval=target_update_interval,
         train_freq=train_freq,
+        gradient_steps=gradient_steps,
         learning_starts=learning_starts,
         policy_kwargs=policy_kwargs,
         verbose=0,
@@ -193,6 +207,7 @@ def train_qrdqn(
     print(f"║  Quantiles: {n_quantiles}                           ║")
     print(f"║  Device: {model.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
 
     pbar = tqdm(total=total_steps, desc="QR-DQN Training", unit="step",

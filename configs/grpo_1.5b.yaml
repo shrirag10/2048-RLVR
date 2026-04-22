@@ -1,0 +1,13 @@
+# GRPO config for Qwen2.5-1.5B (primary agent)
+# VRAM: ~5 GB on RTX 4060 8GB — tight but fits
+model_name: "Qwen/Qwen2.5-1.5B-Instruct"
+dataset_size: 2000
+num_generations: 4             # same as 0.5B for stability
+max_completion_length: 128
+learning_rate: 5.0e-7          # even lower for larger model
+per_device_batch_size: 1
+gradient_accumulation_steps: 2
+lora_r: 16
+lora_alpha: 16
+max_seq_length: 640
+seed: 42

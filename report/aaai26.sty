@@ -1,0 +1,87 @@
+% aaai26.sty — AAAI-26 compatible formatting
+% Two-column, US Letter, Times font, AAAI margins
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{aaai26}[2025/09/01 AAAI-26 compatible formatting]
+
+% ─── Page geometry ─────────────────────────────────────────────────
+\RequirePackage[
+  letterpaper,
+  left=0.75in,
+  right=0.75in,
+  top=0.75in,
+  bottom=1.25in,
+  columnsep=0.375in
+]{geometry}
+
+% ─── Fonts ─────────────────────────────────────────────────────────
+\RequirePackage{mathptmx}          % Times for text + math
+\RequirePackage[scaled=0.92]{helvet} % Helvetica for sans
+\RequirePackage{courier}            % Courier for mono
+
+% ─── Two-column ───────────────────────────────────────────────────
+\twocolumn
+
+% ─── Title formatting ────────────────────────────────────────────
+\RequirePackage{titlesec}
+
+% Section: bold, large, centered
+\titleformat{\section}
+  {\normalfont\large\bfseries\centering}
+  {\thesection.}{0.5em}{}
+\titlespacing{\section}{0pt}{12pt plus 2pt minus 2pt}{6pt plus 1pt minus 1pt}
+
+% Subsection: bold, normal size, left-aligned
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsection}{0.5em}{}
+\titlespacing{\subsection}{0pt}{8pt plus 2pt minus 2pt}{4pt plus 1pt minus 1pt}
+
+% Subsubsection: bold italic, normal size
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\itshape}
+  {\thesubsubsection}{0.5em}{}
+\titlespacing{\subsubsection}{0pt}{6pt plus 1pt minus 1pt}{2pt plus 1pt minus 1pt}
+
+% ─── Title block ─────────────────────────────────────────────────
+\renewcommand{\maketitle}{%
+  \twocolumn[%
+    \begin{center}
+    {\LARGE\bfseries\@title\par}
+    \vspace{12pt}
+    {\large\@author\par}
+    \vspace{16pt}
+    \end{center}
+  ]%
+}
+
+% ─── Abstract ────────────────────────────────────────────────────
+\renewenvironment{abstract}{%
+  \centerline{\large\bfseries Abstract}%
+  \vspace{4pt}%
+  \begin{quote}\small
+}{%
+  \end{quote}%
+  \vspace{8pt}%
+}
+
+% ─── Captions ────────────────────────────────────────────────────
+\RequirePackage[font=small,labelfont=bf]{caption}
+
+% ─── Running headers ────────────────────────────────────────────
+\pagestyle{empty}
+
+% ─── Paragraph spacing ──────────────────────────────────────────
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+
+% ─── Line-breaking tolerance (crucial for two-column) ──────────
+\tolerance=1500
+\emergencystretch=1.5em
+\hfuzz=1.5pt
+\RequirePackage[final,tracking=true,expansion=true,protrusion=true]{microtype}
+
+% ─── Tighten lists ──────────────────────────────────────────────
+\RequirePackage{enumitem}
+\setlist{nosep, leftmargin=1.5em}
+
+\endinput

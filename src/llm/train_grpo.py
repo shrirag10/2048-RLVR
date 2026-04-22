@@ -17,7 +17,6 @@ import json
 import time
 from typing import Optional
 
-import numpy as np
 import torch
 import yaml
 
@@ -92,19 +91,21 @@ def make_game_reward_adapter(dataset):
 def train_grpo(
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
     dataset_size: int = 10_000,
-    num_generations: int = 8,
-    max_completion_length: int = 256,
-    learning_rate: float = 5e-6,
+    num_generations: int = 4,
+    max_completion_length: int = 128,
+    learning_rate: float = 1e-6,
     num_train_epochs: int = 3,
     per_device_batch_size: int = 1,
-    gradient_accumulation_steps: int = 4,
+    gradient_accumulation_steps: int = 2,
     lora_r: int = 16,
     lora_alpha: int = 16,
-    max_seq_length: int = 512,
+    max_seq_length: int = 640,  # MUST equal max_prompt_length + max_completion_length exactly
     output_dir: str = "logs/grpo",
     seed: int = 42,
     config_path: Optional[str] = None,
     steps: Optional[int] = None,
+    stage: int = 1,
+    resume_from: Optional[str] = None,
 ):
     """
     Train the LLM agent using GRPO.
@@ -132,15 +133,45 @@ def train_grpo(
         config_path: Optional YAML config file to override defaults.
         steps: Optional max training steps (overrides epochs).
     """
-    # Load config overrides if provided
+    # Collect all params into a dict so YAML overrides actually apply
+    cfg = dict(
+        model_name=model_name, dataset_size=dataset_size,
+        num_generations=num_generations, max_completion_length=max_completion_length,
+        learning_rate=learning_rate, num_train_epochs=num_train_epochs,
+        per_device_batch_size=per_device_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        lora_r=lora_r, lora_alpha=lora_alpha, max_seq_length=max_seq_length,
+        output_dir=output_dir, seed=seed, steps=steps,
+        resume_from=resume_from,
+    )
+
+    # Load config overrides — mutating cfg directly works correctly
     if config_path and os.path.exists(config_path):
         with open(config_path) as f:
-            config = yaml.safe_load(f)
-        # Override defaults with config values
-        locals_copy = locals()
-        for key, value in config.items():
-            if key in locals_copy and key != "config_path":
-                locals_copy[key] = value
+            overrides = yaml.safe_load(f) or {}
+        unknown = set(overrides) - set(cfg)
+        if unknown:
+            print(f"  [warn] Unknown config keys ignored: {unknown}")
+        cfg.update({k: v for k, v in overrides.items() if k in cfg})
+        print(f"  [config] Loaded overrides from {config_path}: "
+              f"{[k for k in overrides if k in cfg]}")
+
+    # Unpack cfg back to named variables for readability below
+    model_name             = cfg["model_name"]
+    dataset_size           = cfg["dataset_size"]
+    num_generations        = cfg["num_generations"]
+    max_completion_length  = cfg["max_completion_length"]
+    learning_rate          = cfg["learning_rate"]
+    num_train_epochs       = cfg["num_train_epochs"]
+    per_device_batch_size  = cfg["per_device_batch_size"]
+    gradient_accumulation_steps = cfg["gradient_accumulation_steps"]
+    lora_r                 = cfg["lora_r"]
+    lora_alpha             = cfg["lora_alpha"]
+    max_seq_length         = cfg["max_seq_length"]
+    output_dir             = cfg["output_dir"]
+    seed                   = cfg["seed"]
+    steps                  = cfg["steps"]
+    resume_from            = cfg["resume_from"]
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -170,31 +201,45 @@ def train_grpo(
     gc.collect()
 
     # ─── Step 2: Load model with Unsloth ───────────────────────────
-    print("\n[2/4] Loading model with Unsloth QLoRA 4-bit...")
+    if resume_from:
+        print(f"\n[2/4] Resuming from adapter: {resume_from}")
+    else:
+        print("\n[2/4] Loading model with Unsloth QLoRA 4-bit...")
 
     from unsloth import FastLanguageModel
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_length,
-        load_in_4bit=True,
-        dtype=None,  # Auto-detect
-    )
+    if resume_from and os.path.exists(resume_from):
+        # Load base model + existing adapter for continued training
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=resume_from,
+            max_seq_length=max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
+        # Unsloth provides for_training() to re-enable gradient computation
+        FastLanguageModel.for_training(model)
+    else:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=model_name,
+            max_seq_length=max_seq_length,
+            load_in_4bit=True,
+            dtype=None,  # Auto-detect
+        )
 
-    # Apply LoRA adapters
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=lora_r,
-        lora_alpha=lora_alpha,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
-        lora_dropout=0.0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=seed,
-    )
+        # Apply LoRA adapters
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj",
+            ],
+            lora_dropout=0.0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=seed,
+        )
 
     print(f"  Model loaded. Trainable params: {model.print_trainable_parameters()}")
 
@@ -207,7 +252,7 @@ def train_grpo(
         output_dir=output_dir,
         num_generations=num_generations,
         max_completion_length=max_completion_length,
-        max_prompt_length=256,  # Truncate/pad prompts uniformly
+        max_prompt_length=512,  # Prompts run ~400 tokens; give headroom
         learning_rate=learning_rate,
         per_device_train_batch_size=per_device_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
@@ -223,35 +268,108 @@ def train_grpo(
         lr_scheduler_type="cosine",
         report_to="none",  # Use our custom logging
         optim="adamw_8bit",
-        # Research-backed improvements:
-        temperature=0.9,          # High temp for diverse completions (TinyZero uses 1.0)
-        top_p=0.95,               # Nucleus sampling
-        num_iterations=2,         # Reuse samples for efficiency (Open-R1: 2-4)
-        # Reward weights: format > direction > length > game > thinking
-        # Prioritize format learning first since everything depends on it
-        reward_weights=[0.3, 0.3, 0.1, 0.2, 0.1],
+        num_iterations=1,         # 2+ causes completion length drift in Unsloth GRPO
+        temperature=0.7,           # lower = less random = stronger signal
+        beta=4.0,                  # very strong KL penalty — prevents catastrophic divergence
+        max_grad_norm=0.1,         # aggressive clip — prior runs hit grad_norm=74k
+        reward_weights={
+            1: [0.6, 0.4],              # stage 1: format + direction only
+            2: [0.4, 0.3, 0.3],         # stage 2: + game reward
+            3: [0.3, 0.2, 0.3, 0.1, 0.1],  # stage 3: all rewards
+        }[stage],
     )
 
-    # Create adapted game reward function
+    # Build reward function list based on training stage
     game_reward_adapted = make_game_reward_adapter(dataset)
+    reward_funcs_by_stage = {
+        1: [format_reward_fn, direction_reward_fn],
+        2: [format_reward_fn, direction_reward_fn, game_reward_adapted],
+        3: [format_reward_fn, direction_reward_fn, game_reward_adapted,
+            thinking_quality_reward_fn, length_reward_fn],
+    }
 
+    print(f"  Stage {stage} rewards: {[f.__name__ if hasattr(f, '__name__') else 'game_reward' for f in reward_funcs_by_stage[stage]]}")
+
+    # NOTE: Do NOT pass a separate GenerationConfig — it conflicts with Unsloth's
+    # GRPO compiled kernel and causes completion_mask size mismatches at runtime.
+    # generation temperature/top_p are set directly in GRPOConfig above.
     trainer = GRPOTrainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
         train_dataset=dataset,
-        reward_funcs=[
-            format_reward_fn,
-            direction_reward_fn,
-            game_reward_adapted,
-            thinking_quality_reward_fn,
-            length_reward_fn,
-        ],
+        reward_funcs=reward_funcs_by_stage[stage],
     )
+
+    # ── Monkey-patch: fix Unsloth 2026.2.1 completion_mask / completion_ids
+    # shape mismatch.  The compiled GRPO kernel creates completion_mask with
+    # width == max_completion_length, but generated completions can be a few
+    # tokens longer due to BOS/EOS handling.  Truncate everything to match.
+    _orig_prepare = trainer._prepare_inputs
+
+    def _patched_prepare(inputs):
+        inputs = _orig_prepare(inputs)
+        mask_len = inputs["completion_mask"].shape[1]
+        for key in ("completion_ids", "old_per_token_logps",
+                     "ref_per_token_logps", "sampling_per_token_logps"):
+            if key in inputs and inputs[key] is not None:
+                if inputs[key].shape[1] > mask_len:
+                    inputs[key] = inputs[key][:, :mask_len]
+        return inputs
+
+    trainer._prepare_inputs = _patched_prepare
 
     # ─── Step 4: Train ─────────────────────────────────────────────
     print("\n[4/4] Training...")
     start_time = time.time()
+
+    # Progress callback — tqdm bar + per-step reward/loss logging
+    from transformers import TrainerCallback
+    from tqdm import tqdm
+
+    total_steps = trainer.args.max_steps if trainer.args.max_steps > 0 else (
+        len(dataset) // (per_device_batch_size * gradient_accumulation_steps * num_generations)
+        * num_train_epochs
+    )
+
+    class GRPOProgressCallback(TrainerCallback):
+        def __init__(self):
+            self.bar = tqdm(total=total_steps, desc="  GRPO", unit="step",
+                            dynamic_ncols=True, colour="green")
+            self._log_path = os.path.join(output_dir, "train_log.jsonl")
+            # clear previous log
+            open(self._log_path, "w").close()
+
+        def on_log(self, _args, state, _control, logs=None, **kwargs):
+            if not logs:
+                return
+            step = state.global_step
+            loss    = logs.get("loss", logs.get("train_loss"))
+            reward  = logs.get("reward", logs.get("rewards/mean"))
+            fmt_r   = logs.get("rewards/format_reward_fn")
+            dir_r   = logs.get("rewards/direction_reward_fn")
+            elapsed = time.time() - start_time
+
+            postfix = {}
+            if loss   is not None: postfix["loss"]   = f"{loss:.4f}"
+            if reward is not None: postfix["reward"] = f"{reward:.3f}"
+            if fmt_r  is not None: postfix["fmt"]    = f"{fmt_r:.2f}"
+            if dir_r  is not None: postfix["dir"]    = f"{dir_r:.2f}"
+            self.bar.set_postfix(postfix, refresh=False)
+            self.bar.update(max(0, step - self.bar.n))
+
+            # Append to jsonl log
+            record = {"step": step, "elapsed": round(elapsed, 1), **{
+                k: round(v, 5) if isinstance(v, float) else v
+                for k, v in logs.items()
+            }}
+            with open(self._log_path, "a") as f:
+                f.write(json.dumps(record) + "\n")
+
+        def on_train_end(self, _args, _state, _control, **kwargs):
+            self.bar.close()
+
+    trainer.add_callback(GRPOProgressCallback())
 
     trainer.train()
 
@@ -299,18 +417,21 @@ def main():
     parser = argparse.ArgumentParser(description="GRPO Training for 2048 LLM Agent")
     parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
     parser.add_argument("--dataset-size", type=int, default=10_000)
-    parser.add_argument("--num-generations", type=int, default=8)
-    parser.add_argument("--max-completion", type=int, default=256)
-    parser.add_argument("--lr", type=float, default=5e-6)
+    parser.add_argument("--num-generations", type=int, default=4)
+    parser.add_argument("--max-completion", type=int, default=128)
+    parser.add_argument("--lr", type=float, default=1e-6)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--grad-accum", type=int, default=4)
+    parser.add_argument("--grad-accum", type=int, default=2)
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=16)
     parser.add_argument("--output-dir", default="logs/grpo")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--config", default=None, help="YAML config file")
+    parser.add_argument("--resume", default=None, help="Path to adapter dir to resume from")
+    parser.add_argument("--stage", type=int, default=1, choices=[1, 2, 3],
+                        help="Training stage: 1=format+direction, 2=+game reward, 3=all rewards")
 
     args = parser.parse_args()
 
@@ -329,6 +450,8 @@ def main():
         seed=args.seed,
         config_path=args.config,
         steps=args.steps,
+        resume_from=args.resume,
+        stage=args.stage,
     )
 
 

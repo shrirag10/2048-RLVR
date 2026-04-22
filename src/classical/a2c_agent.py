@@ -127,14 +127,15 @@ def train_a2c(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/a2c",
-    reward_mode: str = "score_delta",
+    reward_mode: str = "shaped",          # milestone bonuses at 256/512/1024/2048
     seed: int = 42,
-    lr: float = 7e-4,
-    n_steps: int = 5,
-    gamma: float = 0.99,
-    ent_coef: float = 0.01,
-    vf_coef: float = 0.5,
+    lr: float = 3e-4,
+    n_steps: int = 512,                  # longer n-step returns for long 2048 episodes
+    gamma: float = 0.995,
+    ent_coef: float = 0.1,               # stronger entropy prevents A2C policy collapse
+    vf_coef: float = 0.25,
     max_grad_norm: float = 0.5,
+    n_envs: int = 8,
     device: str = "auto",
 ) -> A2C:
     """
@@ -145,11 +146,23 @@ def train_a2c(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+    import src.env.gym_wrapper  # ensure registration in subprocesses
+
+    vec_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    env = make_vec_env(
+        "Game2048-v0",
+        n_envs=n_envs,
+        env_kwargs={"reward_mode": reward_mode},
+        vec_env_cls=vec_cls,
+        seed=seed,
+    )
 
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
-        "features_extractor_kwargs": {"features_dim": 256},
+        "features_extractor_kwargs": {"features_dim": 512},
+        "net_arch": [{"pi": [256, 256], "vf": [256, 256]}],
     }
 
     model = A2C(
@@ -180,6 +193,7 @@ def train_a2c(
     print(f"║  A2C Training — {total_steps:,} steps              ║")
     print(f"║  Device: {model.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
 
     pbar = tqdm(total=total_steps, desc="A2C Training", unit="step",

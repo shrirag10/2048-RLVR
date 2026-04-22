@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>2048 RL Showcase | Tactile Gallery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode:"class",
+  theme:{extend:{
+    colors:{
+      "tertiary-fixed-dim":"#eec548","surface-bright":"#f8f6f3","surface-container-high":"#e4e2df",
+      "inverse-primary":"#fca151","primary-fixed-dim":"#ec9445","surface-container-highest":"#deddd9",
+      "on-surface":"#2e2f2d","on-primary-container":"#532a00","background":"#f8f6f3",
+      "on-secondary-container":"#8f111d","outline-variant":"#aeadaa","primary-container":"#fca151",
+      "secondary-fixed-dim":"#ffafab","on-secondary":"#ffefee","tertiary-dim":"#624d00",
+      "surface-variant":"#deddd9","surface-container-lowest":"#ffffff","secondary-fixed":"#ffc3bf",
+      "primary":"#8c4a00","on-error":"#ffefec","on-tertiary-fixed-variant":"#685200",
+      "on-secondary-fixed":"#70000f","on-tertiary-container":"#5d4800","on-tertiary":"#fff1d5",
+      "on-surface-variant":"#5b5c59","on-primary-fixed-variant":"#603100","surface-dim":"#d5d4d1",
+      "outline":"#777775","error-dim":"#b92902","on-primary":"#fff0e7","surface-container-low":"#f2f0ed",
+      "surface":"#f8f6f3","surface-tint":"#8c4a00","error-container":"#f95630",
+      "tertiary-container":"#fdd355","primary-dim":"#7b4100","surface-container":"#e9e8e5",
+      "primary-fixed":"#fca151","secondary":"#ac292e","secondary-dim":"#9b1c24",
+      "on-tertiary-fixed":"#463600","secondary-container":"#ffc3bf","on-primary-fixed":"#321700",
+      "inverse-on-surface":"#9e9d9a","on-error-container":"#520c00","inverse-surface":"#0e0e0d",
+      "tertiary":"#705900","on-secondary-fixed-variant":"#9d1d25","tertiary-fixed":"#fdd355",
+      "error":"#b02500","on-background":"#2e2f2d"
+    },
+    fontFamily:{"headline":["Manrope"],"body":["Inter"],"label":["Inter"]},
+    borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},
+  }}
+}
+</script>
+<style>
+.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.glass-panel{background:rgba(248,246,243,0.82);backdrop-filter:blur(24px)}
+.sunken-shadow{box-shadow:0 24px 48px -12px rgba(46,47,45,0.10)}
+.tile{transition:background 0.1s ease,color 0.1s ease;will-change:transform}
+.tile-new{animation:spawnIn .18s cubic-bezier(.34,1.56,.64,1) forwards}
+.tile-merged{animation:mergeIn .18s cubic-bezier(.34,1.56,.64,1) forwards}
+@keyframes spawnIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes mergeIn{0%{transform:scale(1)}45%{transform:scale(1.18)}100%{transform:scale(1)}}
+.nav-item{transition:all .2s ease;cursor:pointer}
+.nav-item.active{background:#fff0e7;color:#8c4a00;font-weight:700}
+.nav-item:not(.active):hover{background:#e9e8e5}
+/* Dark mode overrides */
+html.dark body{background:#1a1a1a;color:#e0e0e0}
+html.dark .bg-background,html.dark .bg-surface,html.dark .bg-surface-bright{background:#1a1a1a!important}
+html.dark .bg-surface-container-low,html.dark .bg-surface-container-lowest{background:#222!important}
+html.dark .bg-surface-container,html.dark .bg-surface-container-high{background:#2a2a2a!important}
+html.dark .bg-surface-container-highest{background:#333!important}
+html.dark .bg-surface-variant{background:#3a3a3a!important}
+html.dark .text-on-surface,html.dark .text-on-background{color:#e0e0e0!important}
+html.dark .text-on-surface-variant{color:#aaa!important}
+html.dark .glass-panel{background:rgba(26,26,26,0.85)}
+html.dark .nav-item.active{background:#3d2800;color:#fca151}
+html.dark .nav-item:not(.active):hover{background:#333}
+html.dark .sunken-shadow{box-shadow:0 24px 48px -12px rgba(0,0,0,0.3)}
+html.dark table tr{border-color:rgba(255,255,255,0.06)!important}
+.bar-animate{transition:height 0.6s cubic-bezier(.22,.68,0,1.2)}
+.prob-bar{transition:width 0.25s ease}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#deddd9;border-radius:99px}
+</style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-hidden h-screen">
+
+<!-- ── App Shell ─────────────────────────────────────────────────────── -->
+<div class="flex h-screen">
+
+  <!-- Sidebar -->
+  <aside class="w-60 shrink-0 bg-surface-container-low flex flex-col py-8 px-3 z-50" style="box-shadow:4px 0 20px rgba(46,47,45,0.05)">
+    <div class="px-3 mb-8">
+      <h1 class="font-headline font-black text-xl tracking-tight text-on-surface">RL Showcase</h1>
+      <p class="text-[10px] text-on-surface-variant font-semibold uppercase tracking-widest mt-0.5">2048 · Tactile Gallery</p>
+    </div>
+    <nav class="space-y-1 flex-1">
+      <div id="nav-game" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl" onclick="showView('game')">
+        <span class="material-symbols-outlined text-[20px]">grid_4x4</span>
+        <span class="text-sm font-body">Play 2048</span>
+      </div>
+      <div id="nav-benchmark" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl" onclick="showView('benchmark')">
+        <span class="material-symbols-outlined text-[20px]">analytics</span>
+        <span class="text-sm font-body">Benchmark</span>
+      </div>
+      <div id="nav-playback" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl" onclick="showView('playback')">
+        <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+        <span class="text-sm font-body">Agent Playback</span>
+      </div>
+    </nav>
+    <div class="px-3 pt-4 space-y-2">
+      <div class="bg-surface-container rounded-xl p-4">
+        <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Best Score</p>
+        <p class="font-headline font-black text-2xl" id="sidebar-best">0</p>
+      </div>
+      <button id="dark-mode-btn" onclick="toggleDarkMode()" class="w-full flex items-center gap-3 px-4 py-3 bg-surface-container rounded-xl hover:bg-surface-container-high transition-all text-sm font-semibold text-on-surface-variant">
+        <span id="dark-mode-icon" class="material-symbols-outlined text-[18px]">dark_mode</span>
+        <span id="dark-mode-label">Dark Mode</span>
+      </button>
+      <a href="https://github.com/shrirag10/RLVR" target="_blank" rel="noopener noreferrer"
+         class="w-full flex items-center gap-3 px-4 py-3 bg-surface-container rounded-xl hover:bg-surface-container-high transition-all text-sm font-semibold text-on-surface-variant group">
+        <svg class="w-[18px] h-[18px] shrink-0 fill-current opacity-70 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 0C5.37 0 0 5.373 0 12c0 5.303 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577
+            0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.757-1.333-1.757
+            -1.09-.745.083-.729.083-.729 1.205.084 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304
+            3.492.997.108-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931
+            0-1.31.468-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.3 1.23
+            .957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.29-1.552 3.297-1.23
+            3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221
+            0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222
+            0 1.606-.015 2.898-.015 3.293 0 .322.216.694.825.576C20.565 21.796 24 17.3 24 12
+            24 5.373 18.627 0 12 0z"/>
+        </svg>
+        <span>View on GitHub</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+    <!-- Top bar -->
+    <header class="shrink-0 px-8 py-4 flex items-center justify-between bg-surface-container-low/60 backdrop-blur-xl" style="box-shadow:0 1px 0 rgba(46,47,45,0.06)">
+      <div>
+        <h2 id="page-title" class="font-headline font-extrabold text-2xl tracking-tight">Play 2048</h2>
+        <p id="page-sub" class="text-xs text-on-surface-variant">Use arrow keys or swipe to move tiles</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="btn-undo" onclick="undoGame()" class="px-5 py-2 rounded-full text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all active:scale-95">Undo</button>
+        <button id="btn-new" onclick="newGame()" class="px-6 py-2 rounded-full bg-primary text-on-primary text-sm font-bold hover:bg-primary-dim transition-all active:scale-95 sunken-shadow">New Game</button>
+      </div>
+    </header>
+
+    <!-- Scrollable content -->
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- ═══ VIEW: GAME ═══════════════════════════════════════════════ -->
+      <div id="view-game" class="max-w-5xl mx-auto px-8 py-10">
+        <!-- Score row -->
+        <div class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+          <div>
+            <h1 class="font-headline font-black text-5xl tracking-tight text-on-surface">The Gallery of Numbers.</h1>
+            <p class="text-on-surface-variant mt-2 max-w-md">Join the tiles, reach 2048, and master mathematical curation.</p>
+          </div>
+          <div class="flex gap-3 shrink-0">
+            <div class="bg-surface-container px-6 py-3 rounded-xl text-center min-w-[110px]">
+              <span class="block text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-0.5">SCORE</span>
+              <span id="score-display" class="font-headline font-black text-2xl">0</span>
+            </div>
+            <div class="bg-surface-container px-6 py-3 rounded-xl text-center min-w-[110px]">
+              <span class="block text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-0.5">BEST</span>
+              <span id="best-display" class="font-headline font-black text-2xl">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-12 items-start">
+          <!-- Board -->
+          <div class="relative shrink-0">
+            <div id="board" class="bg-surface-container-highest p-4 rounded-2xl sunken-shadow grid gap-3"
+                 style="display:grid;grid-template-columns:repeat(4,1fr);width:440px;height:440px;touch-action:none">
+            </div>
+            <!-- Game over overlay -->
+            <div id="game-over-overlay" class="hidden absolute inset-0 rounded-2xl flex flex-col items-center justify-center glass-panel" style="z-index:10">
+              <p class="font-headline font-black text-4xl text-on-surface mb-2">Game Over</p>
+              <p class="text-on-surface-variant mb-6" id="final-score-txt">Score: 0</p>
+              <button onclick="newGame()" class="px-8 py-3 bg-primary text-on-primary font-bold rounded-full sunken-shadow hover:bg-primary-dim transition-all active:scale-95">Play Again</button>
+            </div>
+          </div>
+
+          <!-- Side panel -->
+          <div class="flex-1 space-y-8 py-2">
+            <section>
+              <h3 class="font-headline font-bold text-xl mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">keyboard</span> How to Play
+              </h3>
+              <div class="space-y-4 text-on-surface-variant text-sm leading-relaxed">
+                <p>Use <strong class="text-on-surface underline decoration-primary-container decoration-4 underline-offset-2">arrow keys</strong> or <strong class="text-on-surface underline decoration-primary-container decoration-4 underline-offset-2">swipe</strong> to slide tiles.</p>
+                <p>When two tiles with the same number touch, they <em>merge into one</em>.</p>
+                <div class="bg-surface-container-low p-4 rounded-xl border-l-4 border-primary">
+                  <p class="text-xs italic font-medium">"Reach the 2048 tile through strategic foresight."</p>
+                </div>
+              </div>
+            </section>
+            <section>
+              <h3 class="font-headline font-bold text-xl mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">bar_chart</span> Session Stats
+              </h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-surface-container rounded-xl p-4">
+                  <span class="block text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Moves</span>
+                  <span id="moves-display" class="font-headline text-xl font-black">0</span>
+                </div>
+                <div class="bg-surface-container rounded-xl p-4">
+                  <span class="block text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Max Tile</span>
+                  <span id="maxtile-display" class="font-headline text-xl font-black">0</span>
+                </div>
+              </div>
+            </section>
+            <!-- Tile legend -->
+            <section>
+              <h3 class="font-headline font-bold text-xl mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">palette</span> Tile Spectrum
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                <div id="legend"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: BENCHMARK ══════════════════════════════════════════ -->
+      <div id="view-benchmark" class="hidden max-w-6xl mx-auto px-8 py-10">
+        <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <span class="text-primary font-bold tracking-widest text-xs uppercase mb-2 block">Research Report · Track A vs RLVR</span>
+            <h2 class="font-headline font-black text-4xl tracking-tight mb-3">Neural Architecture vs.<br>LLM Strategic Reasoning</h2>
+            <p class="text-on-surface-variant max-w-xl">Classical RL agents (DQN, PPO, A2C, QR-DQN, SAC) benchmarked against the RLVR-trained Qwen2.5-0.5B in the 2048 environment.</p>
+          </div>
+          <div class="flex flex-col items-end gap-3 shrink-0">
+          <!-- Benchmark training mode toggle -->
+          <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+            <button id="bm-train-1m-btn" onclick="setBmTrainingMode('1m')"
+              class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
+            <button id="bm-train-5m-btn" onclick="setBmTrainingMode('5m')"
+              class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
+          </div>
+          <div class="flex gap-3">
+            <div class="bg-surface-container p-4 rounded-xl min-w-[120px]">
+              <span class="block text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1">Agents</span>
+              <span class="bm-agent-count text-3xl font-black font-headline">—</span>
+            </div>
+            <div class="bg-primary-container p-4 rounded-xl min-w-[120px]">
+              <span class="block text-[10px] font-bold text-on-primary-container tracking-widest uppercase mb-1">Top Tile</span>
+              <span class="bm-top-tile text-3xl font-black font-headline text-on-primary-container">—</span>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <!-- Charts grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <!-- Score convergence -->
+          <div class="md:col-span-2 bg-surface-container-low rounded-3xl p-7">
+            <div class="flex justify-between items-start mb-6">
+              <div>
+                <h3 class="font-headline font-bold text-lg">Score Convergence</h3>
+                <p class="text-xs text-on-surface-variant mt-0.5">Rolling avg score over training episodes</p>
+              </div>
+              <div class="bm-score-legend flex flex-wrap gap-1.5 justify-end max-w-xs"></div>
+            </div>
+            <canvas id="chartScore" height="220"></canvas>
+          </div>
+          <!-- Best agent highlight -->
+          <div class="bg-primary-container rounded-3xl p-7 flex flex-col justify-between relative overflow-hidden group">
+            <div class="z-10 relative">
+              <h3 class="font-black font-headline text-xl text-on-primary-container mb-1">Best Agent</h3>
+              <p class="text-on-primary-container/80 text-xs leading-relaxed">Ranked by average episode score across full training run.</p>
+            </div>
+            <div id="bm-best-card" class="z-10 relative mt-6 space-y-3">
+              <div class="flex justify-between py-2 border-b border-on-primary-container/10 text-xs">
+                <span class="font-bold text-on-primary-container/60 uppercase tracking-tight">Agent</span>
+                <span id="bm-best-name" class="font-black text-on-primary-container">—</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-on-primary-container/10 text-xs">
+                <span class="font-bold text-on-primary-container/60 uppercase tracking-tight">Avg Score</span>
+                <span id="bm-best-score" class="font-black text-on-primary-container">—</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-on-primary-container/10 text-xs">
+                <span class="font-bold text-on-primary-container/60 uppercase tracking-tight">Max Tile</span>
+                <span id="bm-best-tile" class="font-black text-on-primary-container">—</span>
+              </div>
+              <div class="flex justify-between py-2 text-xs">
+                <span class="font-bold text-on-primary-container/60 uppercase tracking-tight">Episodes</span>
+                <span id="bm-best-eps" class="font-black text-on-primary-container">—</span>
+              </div>
+            </div>
+            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-on-primary-container/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+          </div>
+        </div>
+
+        <!-- Max tile distribution -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-1">Max Tile Distribution</h3>
+            <p class="text-xs text-on-surface-variant mb-5">% of episodes reaching each tile milestone</p>
+            <canvas id="chartTile" height="220"></canvas>
+          </div>
+          <!-- Comparison table -->
+          <div class="bg-surface-container rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-5">Comparative Metrics</h3>
+            <table class="w-full">
+              <thead>
+                <tr class="border-b border-outline-variant/20">
+                  <th class="pb-3 text-[10px] uppercase tracking-widest text-on-surface-variant text-left font-bold">Agent</th>
+                  <th class="pb-3 text-[10px] uppercase tracking-widest text-on-surface-variant text-center font-bold">Max Tile</th>
+                  <th class="pb-3 text-[10px] uppercase tracking-widest text-on-surface-variant text-right font-bold">Avg Score</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-table" class="divide-y divide-outline-variant/10 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Episode Length Distribution + Win Rate Progression -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-1">Episode Length Distribution</h3>
+            <p class="text-xs text-on-surface-variant mb-5">Number of episodes per length bucket</p>
+            <canvas id="chartEpLength" height="220"></canvas>
+          </div>
+          <div class="bg-surface-container-low rounded-3xl p-7">
+            <h3 class="font-headline font-bold text-lg mb-1">Tile 512+ Rate Over Training</h3>
+            <p class="text-xs text-on-surface-variant mb-5">Cumulative % of episodes reaching 512+ tile</p>
+            <canvas id="chartWinRate" height="220"></canvas>
+          </div>
+        </div>
+
+        <!-- 1M vs 5M Comparison -->
+        <div class="bg-surface-container-low rounded-3xl p-7 mb-8">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <h3 class="font-headline font-bold text-lg">1M vs 5M Training Comparison</h3>
+              <p class="text-xs text-on-surface-variant mt-0.5">Side-by-side agent performance at 1M and 5M training steps</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="cmp-score-btn" onclick="setCmpMetric('avg_score')" class="px-3 py-1 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">Avg Score</button>
+              <button id="cmp-tile-btn" onclick="setCmpMetric('max_tile')" class="px-3 py-1 text-xs font-bold rounded-lg text-on-surface-variant transition-all">Max Tile</button>
+            </div>
+          </div>
+          <canvas id="chartCompare" height="240"></canvas>
+        </div>
+
+
+        <!-- Board topology -->
+        <div class="bg-surface-container-lowest rounded-3xl p-10 text-center" style="border:1px solid rgba(174,173,170,0.15)">
+          <h3 class="font-headline font-black text-2xl mb-3">Tile Spectrum · Design System</h3>
+          <p class="text-on-surface-variant text-sm max-w-lg mx-auto mb-8">Each tile value maps to a distinct color token — low values bloom from tertiary, high values ignite through primary into secondary.</p>
+          <div class="flex justify-center flex-wrap gap-3" id="tile-spectrum"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: PLAYBACK ═══════════════════════════════════════════ -->
+      <div id="view-playback" class="hidden max-w-6xl mx-auto px-8 py-10">
+        <div class="flex flex-col xl:flex-row gap-10 items-start">
+
+          <!-- Left: board + controls -->
+          <div class="shrink-0">
+            <!-- ── Playback controls row ──────────────────────────── -->
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+
+              <!-- Agent dropdown -->
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Agent</label>
+                <select id="agent-select" disabled
+                  class="bg-surface-container text-on-surface text-sm font-semibold px-3 py-2 rounded-xl outline-none min-w-[200px]">
+                  <option value="">⏳ Loading agents…</option>
+                </select>
+              </div>
+
+              <!-- Speed -->
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Speed</label>
+                <select id="speed-select" class="bg-surface-container text-on-surface text-sm font-semibold px-3 py-2 rounded-xl outline-none">
+                  <option value="600">Slow</option>
+                  <option value="300" selected>Normal</option>
+                  <option value="80">Fast</option>
+                  <option value="20">Turbo</option>
+                </select>
+              </div>
+
+              <!-- Spacer -->
+              <div class="flex-1"></div>
+
+              <!-- Training steps -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Training</span>
+                <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+                  <button id="train-1m-btn" onclick="setTrainingMode('1m')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">1M</button>
+                  <button id="train-5m-btn" onclick="setTrainingMode('5m')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">5M</button>
+                </div>
+              </div>
+
+              <!-- Replay mode -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Replay Mode</span>
+                <div class="flex items-center gap-1 bg-surface-container rounded-xl p-1">
+                  <button id="mode-normal-btn" onclick="setReplayMode('normal')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-on-primary transition-all">Normal</button>
+                  <button id="mode-hunt-btn" onclick="setReplayMode('hunt')"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg text-on-surface-variant transition-all">🎯 Hunt</button>
+                </div>
+              </div>
+
+              <!-- Refresh -->
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Refresh</span>
+                <button onclick="refreshPlayback()" title="Reload agents from manifest"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-xl transition-all text-xs font-bold">
+                  <span class="material-symbols-outlined text-[16px]">refresh</span>
+                  Reload
+                </button>
+              </div>
+            </div>
+
+            <!-- ── Agent info card (updates on agent select) ────────── -->
+            <div id="agent-info-bar" class="hidden mb-4 bg-surface-container-low rounded-2xl px-5 py-3 flex items-center gap-6">
+              <div class="flex items-center gap-2">
+                <span id="agent-info-dot" class="inline-block w-3 h-3 rounded-full bg-primary"></span>
+                <span id="agent-info-name" class="font-headline font-black text-sm">—</span>
+                <span id="agent-info-badge" class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-primary-container text-on-primary-container rounded-full">1M</span>
+              </div>
+              <div class="flex gap-5 ml-auto">
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Avg Score</p>
+                  <p id="agent-info-avg" class="font-headline font-black text-lg">—</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Max Tile</p>
+                  <p id="agent-info-tile" class="font-headline font-black text-lg">—</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Avg Moves</p>
+                  <p id="agent-info-moves" class="font-headline font-black text-lg">—</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Replay info bar (hidden until replay loaded) -->
+            <div id="replay-bar" class="hidden mb-4 flex items-center gap-3 bg-primary-container/40 rounded-xl px-4 py-2.5">
+              <span class="material-symbols-outlined text-primary text-[18px]">browse_activity</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-primary truncate" id="replay-label">replay.json</p>
+                <p class="text-[10px] text-on-surface-variant" id="replay-meta">— episodes</p>
+              </div>
+              <select id="replay-ep-select" class="hidden bg-surface-container text-on-surface text-xs font-semibold px-2 py-1.5 rounded-lg outline-none"></select>
+              <button onclick="clearReplay()" class="text-on-surface-variant hover:text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div class="relative">
+              <div id="pb-board" class="bg-surface-container-highest p-4 rounded-2xl sunken-shadow grid gap-3"
+                   style="display:grid;grid-template-columns:repeat(4,1fr);width:440px;height:440px">
+              </div>
+              <div id="pb-done" class="hidden absolute inset-0 rounded-2xl flex flex-col items-center justify-center glass-panel" style="z-index:10">
+                <p class="font-headline font-black text-3xl text-on-surface mb-2">Episode Done</p>
+                <p class="text-on-surface-variant mb-5 text-sm" id="pb-done-txt"></p>
+                <button onclick="pbNewEpisode()" class="px-7 py-2.5 bg-primary text-on-primary font-bold rounded-full sunken-shadow hover:bg-primary-dim transition-all active:scale-95">Replay</button>
+              </div>
+              <!-- No-data overlay -->
+              <div id="pb-nodata" class="hidden absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center px-8" style="z-index:10;background:rgba(248,246,243,0.94);backdrop-filter:blur(16px)">
+                <span class="material-symbols-outlined text-[40px] text-on-surface-variant mb-3">terminal</span>
+                <p class="font-headline font-black text-xl text-on-surface mb-1" id="nodata-title">No data available</p>
+                <p class="text-xs text-on-surface-variant mb-4" id="nodata-sub">Run the following command to generate:</p>
+                <code id="nodata-cmd" class="block bg-surface-container text-on-surface font-mono text-xs px-4 py-2.5 rounded-xl mb-2 max-w-full break-all"></code>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-3 mt-5">
+              <button id="pb-play-btn" onclick="pbToggle()" class="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary font-bold rounded-full sunken-shadow hover:bg-primary-dim transition-all active:scale-95">
+                <span id="pb-play-icon" class="material-symbols-outlined text-[18px]">play_arrow</span>
+                <span id="pb-play-label">Play</span>
+              </button>
+              <button onclick="pbStep()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Step</button>
+              <button onclick="pbStepBack()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Back</button>
+              <button onclick="pbNewEpisode()" class="px-5 py-2.5 bg-surface-container text-on-surface font-semibold rounded-full hover:bg-surface-container-high transition-all active:scale-95 text-sm">Restart</button>
+              <div class="ml-auto text-right">
+                <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Episode Score</p>
+                <p id="pb-score" class="font-headline font-black text-xl">0</p>
+              </div>
+            </div>
+            <!-- Keyboard shortcuts hint -->
+            <div class="mt-3 flex flex-wrap gap-3 text-[10px] text-on-surface-variant font-semibold uppercase tracking-widest">
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">Space</kbd> / <kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">&rarr;</kbd> Step</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">&larr;</kbd> Back</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">P</kbd> Play/Pause</span>
+              <span><kbd class="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-mono">R</kbd> Restart</span>
+            </div>
+          </div>
+
+          <!-- Right: researcher lens -->
+          <div class="flex-1 space-y-5 min-w-0">
+            <!-- Move probabilities -->
+            <div class="bg-surface-container-low rounded-2xl p-6">
+              <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">cognition</span> Move Probabilities
+              </h3>
+              <div class="space-y-3" id="prob-bars">
+                <div class="flex items-center gap-3"><span class="text-xs font-bold w-6 uppercase text-on-surface-variant">↑</span><div class="flex-1 bg-surface-variant rounded-full h-3 overflow-hidden"><div id="prob-up" class="prob-bar h-full rounded-full bg-primary" style="width:25%"></div></div><span id="pv-up" class="text-xs font-bold w-8 text-right">25%</span></div>
+                <div class="flex items-center gap-3"><span class="text-xs font-bold w-6 uppercase text-on-surface-variant">→</span><div class="flex-1 bg-surface-variant rounded-full h-3 overflow-hidden"><div id="prob-right" class="prob-bar h-full rounded-full bg-primary" style="width:25%"></div></div><span id="pv-right" class="text-xs font-bold w-8 text-right">25%</span></div>
+                <div class="flex items-center gap-3"><span class="text-xs font-bold w-6 uppercase text-on-surface-variant">↓</span><div class="flex-1 bg-surface-variant rounded-full h-3 overflow-hidden"><div id="prob-down" class="prob-bar h-full rounded-full bg-primary" style="width:25%"></div></div><span id="pv-down" class="text-xs font-bold w-8 text-right">25%</span></div>
+                <div class="flex items-center gap-3"><span class="text-xs font-bold w-6 uppercase text-on-surface-variant">←</span><div class="flex-1 bg-surface-variant rounded-full h-3 overflow-hidden"><div id="prob-left" class="prob-bar h-full rounded-full bg-primary" style="width:25%"></div></div><span id="pv-left" class="text-xs font-bold w-8 text-right">25%</span></div>
+              </div>
+            </div>
+
+            <!-- Episode stats -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-surface-container rounded-2xl p-5">
+                <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Moves</p>
+                <p id="pb-moves" class="font-headline font-black text-2xl">0</p>
+              </div>
+              <div class="bg-surface-container rounded-2xl p-5">
+                <p class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mb-1">Max Tile</p>
+                <p id="pb-maxtile" class="font-headline font-black text-2xl">0</p>
+              </div>
+            </div>
+
+            <!-- Thinking log -->
+            <div class="bg-surface-container-low rounded-2xl p-6 flex-1">
+              <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">terminal</span> Agent Reasoning Log
+              </h3>
+              <div id="agent-log" class="space-y-2 max-h-64 overflow-y-auto font-mono text-xs text-on-surface-variant"></div>
+            </div>
+
+            <!-- Score progression chart -->
+            <div class="bg-surface-container-low rounded-2xl p-6">
+              <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">show_chart</span> Score Progression
+              </h3>
+              <canvas id="chartPbHistory" height="120"></canvas>
+            </div>
+
+            <!-- Action distribution doughnut -->
+            <div class="bg-surface-container-low rounded-2xl p-6">
+              <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">donut_large</span> Action Distribution
+              </h3>
+              <div class="flex items-center justify-center" style="max-height:200px">
+                <canvas id="chartPbActions" height="160"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end scroll -->
+  </div><!-- end main -->
+</div><!-- end shell -->
+
+<script>
+/* ═════════════════════════════════════════════════════════
+   GAME ENGINE
+═════════════════════════════════════════════════════════ */
+class Game2048 {
+  constructor(size=4){
+    this.size=size; this.board=this._empty(); this.score=0; this.done=false;
+    this._addTile(); this._addTile();
+  }
+  _empty(){return Array.from({length:this.size},()=>Array(this.size).fill(0))}
+  _addTile(){
+    const e=[];
+    for(let r=0;r<this.size;r++)for(let c=0;c<this.size;c++)if(!this.board[r][c])e.push([r,c]);
+    if(!e.length)return null;
+    const[r,c]=e[Math.floor(Math.random()*e.length)];
+    this.board[r][c]=Math.random()<0.9?2:4; return [r,c];
+  }
+  _slideRow(row){
+    const nz=row.filter(x=>x); let merged=[]; let sc=0;
+    for(let i=0;i<nz.length;i++){
+      if(i+1<nz.length&&nz[i]===nz[i+1]){const v=nz[i]*2;merged.push(v);sc+=v;i++;}
+      else merged.push(nz[i]);
+    }
+    while(merged.length<this.size)merged.push(0);
+    return{row:merged,score:sc};
+  }
+  _rotate(b,k){
+    let r=b.map(row=>[...row]);
+    for(let i=0;i<(((k%4)+4)%4);i++){
+      const n=r.length,nr=Array.from({length:n},()=>Array(n).fill(0));
+      for(let x=0;x<n;x++)for(let y=0;y<n;y++)nr[n-1-y][x]=r[x][y];
+      r=nr;
+    }
+    return r;
+  }
+  _eq(a,b){return a.flat().every((v,i)=>v===b.flat()[i])}
+  step(action){
+    // 0=UP 1=RIGHT 2=DOWN 3=LEFT
+    const kMap={0:1,1:2,2:3,3:0};
+    const k=kMap[action];
+    let rot=this._rotate(this.board,k);
+    let sc=0;
+    for(let r=0;r<this.size;r++){const{row,score}=this._slideRow(rot[r]);rot[r]=row;sc+=score;}
+    const nb=this._rotate(rot,-k);
+    const changed=!this._eq(this.board,nb);
+    if(changed){this.board=nb;this.score+=sc;this._addTile();}
+    this.done=!this._hasMoves();
+    return{changed,scoreDelta:sc};
+  }
+  _hasMoves(){
+    for(let r=0;r<this.size;r++)for(let c=0;c<this.size;c++){
+      if(!this.board[r][c])return true;
+      if(c+1<this.size&&this.board[r][c]===this.board[r][c+1])return true;
+      if(r+1<this.size&&this.board[r][c]===this.board[r+1][c])return true;
+    }
+    return false;
+  }
+  maxTile(){return Math.max(...this.board.flat())}
+  clone(){const g=new Game2048(this.size);g.board=this.board.map(r=>[...r]);g.score=this.score;g.done=this.done;return g;}
+}
+
+/* ═════════════════════════════════════════════════════════
+   TILE COLORS
+═════════════════════════════════════════════════════════ */
+const TILE_STYLES={
+  0:   {bg:'#e9e8e5',text:'transparent'},
+  2:   {bg:'linear-gradient(135deg,#fdd355,#eec548)',text:'#5d4800'},
+  4:   {bg:'linear-gradient(135deg,#eec548,#fdd355)',text:'#463600'},
+  8:   {bg:'linear-gradient(135deg,#fca151,#ec9445)',text:'#321700'},
+  16:  {bg:'linear-gradient(135deg,#ec9445,#fca151)',text:'#321700'},
+  32:  {bg:'linear-gradient(135deg,#8c4a00,#fca151)',text:'#fff0e7'},
+  64:  {bg:'linear-gradient(135deg,#7b4100,#8c4a00)',text:'#fff0e7'},
+  128: {bg:'linear-gradient(135deg,#ac292e,#ea9fa0)',text:'#fff'},
+  256: {bg:'linear-gradient(135deg,#9b1c24,#ac292e)',text:'#fff'},
+  512: {bg:'linear-gradient(135deg,#70000f,#9b1c24)',text:'#fff'},
+  1024:{bg:'linear-gradient(135deg,#2e2f2d,#5b5c59)',text:'#fca151'},
+  2048:{bg:'linear-gradient(135deg,#0e0e0d,#7b4100)',text:'#fca151'},
+  4096:{bg:'linear-gradient(135deg,#0e0e0d,#1a0a00)',text:'#fdd355'},
+};
+function tileStyle(v){return TILE_STYLES[v]||{bg:'linear-gradient(135deg,#0e0e0d,#0e0e0d)',text:'#fff'}}
+function fontSize(v){return v>=1000?'text-xl':v>=100?'text-2xl':'text-3xl'}
+
+/* ═════════════════════════════════════════════════════════
+   BOARD RENDERER
+═════════════════════════════════════════════════════════ */
+function renderBoard(boardEl, game, newPos=null, mergedPos=null){
+  const cells=boardEl.querySelectorAll('.cell');
+  const flat=game.board.flat();
+  flat.forEach((v,i)=>{
+    const cell=cells[i];
+    const st=tileStyle(v);
+    cell.style.background=st.bg;
+    cell.style.color=v?st.text:'transparent';
+    cell.textContent=v||'';
+    cell.className=`cell tile flex items-center justify-center font-headline font-black rounded-xl ${fontSize(v)}`;
+    if(newPos&&newPos[0]*4+newPos[1]===i)cell.classList.add('tile-new');
+    if(mergedPos&&mergedPos.some(([r,c])=>r*4+c===i))cell.classList.add('tile-merged');
+  });
+}
+function createCells(boardEl,size=4){
+  boardEl.innerHTML='';
+  for(let i=0;i<size*size;i++){
+    const d=document.createElement('div');
+    d.className='cell tile flex items-center justify-center font-headline font-black rounded-xl text-3xl';
+    d.style.background='#e9e8e5';
+    boardEl.appendChild(d);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   HUMAN GAME STATE
+═════════════════════════════════════════════════════════ */
+let game=null, gameHistory=[], gameMoves=0, bestScore=parseInt(localStorage.getItem('rlvr-best')||'0');
+
+function newGame(){
+  game=new Game2048(); gameHistory=[]; gameMoves=0;
+  document.getElementById('game-over-overlay').classList.add('hidden');
+  renderHumanBoard(); updateHumanUI();
+}
+function renderHumanBoard(np=null,mp=null){
+  const b=document.getElementById('board');
+  if(!b.children.length)createCells(b);
+  renderBoard(b,game,np,mp);
+}
+function updateHumanUI(){
+  document.getElementById('score-display').textContent=game.score.toLocaleString();
+  document.getElementById('moves-display').textContent=gameMoves;
+  document.getElementById('maxtile-display').textContent=game.maxTile();
+  if(game.score>bestScore){bestScore=game.score;localStorage.setItem('rlvr-best',bestScore);}
+  document.getElementById('best-display').textContent=bestScore.toLocaleString();
+  document.getElementById('sidebar-best').textContent=bestScore.toLocaleString();
+  if(game.done){
+    document.getElementById('game-over-overlay').classList.remove('hidden');
+    document.getElementById('final-score-txt').textContent='Score: '+game.score.toLocaleString()+' · Best tile: '+game.maxTile();
+  }
+}
+function undoGame(){
+  if(gameHistory.length<2)return;
+  gameHistory.pop();
+  const prev=gameHistory[gameHistory.length-1];
+  game.board=prev.board.map(r=>[...r]);game.score=prev.score;game.done=false;
+  gameMoves=Math.max(0,gameMoves-1);
+  renderHumanBoard();updateHumanUI();
+}
+function doMove(action){
+  if(game.done)return;
+  gameHistory.push({board:game.board.map(r=>[...r]),score:game.score});
+  if(gameHistory.length>30)gameHistory.shift();
+  const{changed}=game.step(action);
+  if(changed){gameMoves++;renderHumanBoard();updateHumanUI();}
+}
+
+/* keyboard */
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('view-game').classList.contains('hidden'))return;
+  const map={ArrowUp:0,ArrowRight:1,ArrowDown:2,ArrowLeft:3,w:0,d:1,s:2,a:3};
+  if(e.key in map){e.preventDefault();doMove(map[e.key]);}
+});
+
+/* touch swipe */
+let tx0=0,ty0=0;
+document.getElementById('board').addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY;},{passive:true});
+document.getElementById('board').addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx0,dy=e.changedTouches[0].clientY-ty0;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
+  if(Math.abs(dx)>Math.abs(dy))doMove(dx>0?1:3);else doMove(dy>0?2:0);
+},{passive:true});
+
+/* ═════════════════════════════════════════════════════════
+   NAVIGATION
+═════════════════════════════════════════════════════════ */
+const VIEW_META={
+  game:{title:'Play 2048',sub:'Use arrow keys or swipe to move tiles',showUndo:true,showNew:true},
+  benchmark:{title:'Benchmark Dashboard',sub:'Classical RL vs RLVR agent comparison',showUndo:false,showNew:false},
+  playback:{title:'Agent Playback',sub:'Watch a trained agent play in real time',showUndo:false,showNew:false},
+};
+function showView(v){
+  ['game','benchmark','playback'].forEach(id=>{
+    document.getElementById('view-'+id).classList.toggle('hidden',id!==v);
+    document.getElementById('nav-'+id).classList.toggle('active',id===v);
+  });
+  const m=VIEW_META[v];
+  document.getElementById('page-title').textContent=m.title;
+  document.getElementById('page-sub').textContent=m.sub;
+  document.getElementById('btn-undo').classList.toggle('hidden',!m.showUndo);
+  document.getElementById('btn-new').classList.toggle('hidden',!m.showNew);
+  if(v==='benchmark')initBenchmark();
+  if(v==='playback')initPlayback();
+}
+
+/* ═════════════════════════════════════════════════════════
+   BENCHMARK DATA & CHARTS  — real CSV data
+═════════════════════════════════════════════════════════ */
+const AGENT_DEFS = [
+  {id:'dqn',   name:'DQN',          color:'#5b5c59'},
+  {id:'ppo',   name:'PPO',          color:'#705900'},
+  {id:'a2c',   name:'A2C',          color:'#aeadaa'},
+  {id:'qrdqn', name:'QR-DQN',       color:'#ac292e'},
+  {id:'sac',   name:'SAC',          color:'#9b1c24'},
+  {id:'lfa',   name:'LFA',          color:'#1a6b3a'},
+  {id:'grpo',  name:'GRPO (Qwen2.5)',color:'#6b21a8'},
+  {id:'grpo_0.5b', name:'GRPO (0.5B)', color:'#7c3aed'},
+  {id:'grpo_1.5b', name:'GRPO (1.5B)', color:'#5b21b6'},
+];
+
+function _parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(l => {
+    const v = l.split(',');
+    return Object.fromEntries(hdrs.map((h, i) => [h, v[i]?.trim()]));
+  });
+}
+
+function _rollingAvgDownsample(arr, nPts, win) {
+  const step = arr.length / nPts;
+  return Array.from({length: nPts}, (_, i) => {
+    const c = Math.floor(i * step);
+    const sl = arr.slice(Math.max(0, c - win), Math.min(arr.length, c + win));
+    return sl.reduce((a, b) => a + b, 0) / sl.length;
+  });
+}
+
+let bmInited = false, chartScore = null, chartTile = null;
+
+async function initBenchmark() {
+  if (bmInited) return; bmInited = true;
+
+  /* tile spectrum + game legend (static — render immediately) */
+  const sp = document.getElementById('tile-spectrum');
+  [2,4,8,16,32,64,128,256,512,1024,2048].forEach(v => {
+    const st = tileStyle(v);
+    sp.innerHTML += `<div class="w-16 h-16 flex items-center justify-center rounded-xl font-headline font-black text-sm" style="background:${st.bg};color:${st.text}">${v}</div>`;
+  });
+  const leg = document.getElementById('legend');
+  if (leg) [2,4,8,16,32,64,128,256,512,1024,2048].forEach(v => {
+    const st = tileStyle(v);
+    leg.innerHTML += `<span class="inline-flex items-center justify-center w-10 h-10 rounded-lg font-headline font-black text-xs mr-1 mb-1" style="background:${st.bg};color:${st.text}">${v}</span>`;
+  });
+
+  /* fetch & parse all CSVs in parallel.
+     In 5M mode: only try logs/{id}_5m/ — no fallback to base dir. */
+  const modeSuffix = _trainingMode === '5m' ? '_5m' : '';
+  const loaded = await Promise.all(AGENT_DEFS.map(async def => {
+    try {
+      const url = `logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const rows = _parseCSV(await r.text());
+      if (!rows.length) return null;
+
+      const scores = rows.map(r => +r.total_score);
+      const tiles  = rows.map(r => +r.max_tile);
+      const n = rows.length;
+      return {
+        ...def,
+        n,
+        avgScore:  scores.reduce((a, b) => a + b, 0) / n,
+        maxTile:   Math.max(...tiles),
+        reach256:  tiles.filter(t => t >= 256).length / n,
+        reach512:  tiles.filter(t => t >= 512).length / n,
+        reach1024: tiles.filter(t => t >= 1024).length / n,
+        curve:     _rollingAvgDownsample(scores, 200, 75),
+      };
+    } catch(e) { return null; }
+  }));
+  const agents = loaded.filter(Boolean).sort((a, b) => b.avgScore - a.avgScore);
+
+  /* update hero stats */
+  const topTile = agents.reduce((m, a) => Math.max(m, a.maxTile), 0);
+  document.querySelectorAll('.bm-top-tile').forEach(el => el.textContent = topTile.toLocaleString());
+  document.querySelectorAll('.bm-agent-count').forEach(el => el.textContent = agents.length);
+
+  /* best agent card */
+  if (agents.length) {
+    const best = agents[0];
+    document.getElementById('bm-best-name').textContent  = best.name;
+    document.getElementById('bm-best-score').textContent = Math.round(best.avgScore).toLocaleString();
+    document.getElementById('bm-best-tile').textContent  = best.maxTile.toLocaleString();
+    document.getElementById('bm-best-eps').textContent   = best.n.toLocaleString();
+  }
+
+  const eps = Array.from({length: 200}, (_, i) => Math.round(i * (agents[0]?.n ?? 200) / 200));
+
+  /* score convergence chart */
+  chartScore = new Chart(document.getElementById('chartScore'), {
+    type: 'line',
+    data: {
+      labels: eps,
+      datasets: agents.map(a => ({
+        label: a.name, data: a.curve, borderColor: a.color,
+        backgroundColor: a.color + '18', fill: false,
+        tension: 0.4, pointRadius: 0, borderWidth: 2,
+      }))
+    },
+    options: {responsive: true, plugins: {legend: {display: false}}, scales: {
+      x: {ticks: {maxTicksLimit: 6, font: {family:'Inter', size:10}}, grid: {display: false},
+          title: {display: true, text: 'Episode', font: {family:'Inter', size:9}}},
+      y: {ticks: {font: {family:'Inter', size:10}, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v},
+          grid: {color: 'rgba(0,0,0,0.04)'},
+          title: {display: true, text: 'Avg Score (rolling)', font: {family:'Inter', size:9}}}
+    }}
+  });
+
+  /* tile milestone distribution chart */
+  const milestones = [
+    {label:'1024+', key:'reach1024', color:'#8c4a00'},
+    {label:'512+',  key:'reach512',  color:'#fca151'},
+    {label:'256+',  key:'reach256',  color:'#fdd355'},
+  ];
+  chartTile = new Chart(document.getElementById('chartTile'), {
+    type: 'bar',
+    data: {
+      labels: agents.map(a => a.name),
+      datasets: milestones.map(m => ({
+        label: m.label,
+        data: agents.map(a => +((a[m.key] ?? 0) * 100).toFixed(2)),
+        backgroundColor: m.color, borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: {legend: {position:'bottom', labels:{font:{family:'Inter',size:10}, boxWidth:10}}},
+      scales: {
+        x: {ticks:{font:{family:'Inter',size:10}}, grid:{display:false}},
+        y: {ticks:{font:{family:'Inter',size:10}, callback: v => v+'%'}, max:100, grid:{color:'rgba(0,0,0,0.04)'}}
+      }
+    }
+  });
+
+  /* comparative metrics table */
+  const tbody = document.getElementById('metrics-table');
+  tbody.innerHTML = '';
+  agents.forEach((a, i) => {
+    const tileBg = i === 0 ? 'bg-primary-container text-on-primary-container' : 'bg-surface-variant text-on-surface-variant';
+    tbody.innerHTML += `<tr>
+      <td class="py-3 font-semibold text-sm">${a.name}</td>
+      <td class="py-3 text-center"><span class="${tileBg} text-xs px-2 py-0.5 rounded font-bold">${a.maxTile.toLocaleString()}</span></td>
+      <td class="py-3 text-right font-headline font-bold">${Math.round(a.avgScore).toLocaleString()}</td>
+    </tr>`;
+  });
+
+  /* update legend chips in score chart header */
+  const legendEl = document.querySelector('.bm-score-legend');
+  if (legendEl) {
+    legendEl.innerHTML = agents.map(a =>
+      `<span class="flex items-center gap-1 text-[10px] font-bold px-2 py-1 bg-surface-container rounded-full">
+        <span class="w-2 h-2 rounded-full inline-block" style="background:${a.color}"></span>${a.name}
+      </span>`
+    ).join('');
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   AGENT PLAYBACK  (replay-only — no heuristics)
+═════════════════════════════════════════════════════════ */
+let pbPlaying=false,pbTimer=null,pbMoves=0;
+let pbHistChart=null;
+let pbScoreHistory=[];   // {move, score} sampled every 20 steps for chart
+
+function pbStep(){
+  replayStep();
+}
+function renderPbBoard(){
+  const b=document.getElementById('pb-board');
+  if(!b.children.length)createCells(b);
+  // render from current replay step's board if in replay mode, else empty
+  if(replayData){
+    const epIdx=parseInt(document.getElementById('replay-ep-select').value)||0;
+    const ep=replayData.episodes[epIdx];
+    if(ep&&ep.steps[replayStepIdx-1]){
+      renderBoard(b,{board:ep.steps[replayStepIdx-1].board});
+      return;
+    }
+  }
+  renderBoard(b,new Game2048());
+}
+function pbNewEpisode(){
+  pbStop();
+  replayStepIdx=0;
+  pbMoves=0;
+  pbScoreHistory=[];
+  if(pbHistChart){pbHistChart.data.labels=[];pbHistChart.data.datasets[0].data=[];pbHistChart.update();}
+  document.getElementById('pb-done').classList.add('hidden');
+  document.getElementById('agent-log').innerHTML='';
+  document.getElementById('pb-score').textContent='0';
+  document.getElementById('pb-moves').textContent='0';
+  document.getElementById('pb-maxtile').textContent='0';
+  // reset prob bars to equal
+  ['up','right','down','left'].forEach(n=>{
+    document.getElementById('prob-'+n).style.width='25%';
+    document.getElementById('pv-'+n).textContent='25%';
+  });
+  // render first board of current episode
+  if(replayData){
+    const epIdx=parseInt(document.getElementById('replay-ep-select').value)||0;
+    loadReplayEpisode(epIdx);
+  }
+}
+function pbToggle(){
+  if(pbPlaying)pbStop();else pbStart();
+}
+function pbStart(){
+  if(replayData){
+    const epIdx=parseInt(document.getElementById('replay-ep-select').value)||0;
+    const ep=replayData.episodes[epIdx];
+    if(!ep||replayStepIdx>=ep.steps.length){
+      replayStepIdx=0;
+      loadReplayEpisode(epIdx);
+    }
+  }
+  pbPlaying=true;
+  document.getElementById('pb-play-icon').textContent='pause';
+  document.getElementById('pb-play-label').textContent='Pause';
+  function tick(){
+    if(!pbPlaying)return;
+    replayStep();
+    const epIdx=parseInt(document.getElementById('replay-ep-select').value)||0;
+    const ep=replayData?.episodes[epIdx];
+    if(ep&&replayStepIdx<ep.steps.length)
+      pbTimer=setTimeout(tick,parseInt(document.getElementById('speed-select').value));
+  }
+  tick();
+}
+function pbStop(){
+  pbPlaying=false;clearTimeout(pbTimer);
+  document.getElementById('pb-play-icon').textContent='play_arrow';
+  document.getElementById('pb-play-label').textContent='Play';
+}
+function updatePbHistChart(){
+  const labels = pbScoreHistory.map(p => p.move);
+  const data   = pbScoreHistory.map(p => p.score);
+  if(!pbHistChart){
+    pbHistChart=new Chart(document.getElementById('chartPbHistory'),{
+      type:'line',
+      data:{labels, datasets:[{data, borderColor:'#8c4a00', backgroundColor:'rgba(140,74,0,0.08)',
+            fill:true, tension:0.3, pointRadius:0, borderWidth:2}]},
+      options:{responsive:true,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{font:{family:'Inter',size:9},callback:(_,i)=>labels[i]},grid:{display:false}},
+                y:{ticks:{font:{family:'Inter',size:9},callback:v=>v>=1000?(v/1000).toFixed(1)+'k':v},grid:{color:'rgba(0,0,0,0.04)'}}}}
+    });
+  } else {
+    pbHistChart.data.labels=labels;
+    pbHistChart.data.datasets[0].data=data;
+    pbHistChart.update('none');
+  }
+}
+let pbInited=false;
+function initPlayback(){
+  if(pbInited)return; pbInited=true;
+  // Show empty board while manifest loads
+  const b=document.getElementById('pb-board');
+  createCells(b);
+  loadManifest();
+}
+
+/* ═════════════════════════════════════════════════════════
+   REPLAY MODE
+═════════════════════════════════════════════════════════ */
+let replayData = null;     // parsed JSON from replays.json
+let replayMode = false;
+let replayStepIdx = 0;
+
+// Replay file fallback (keep for dev use)
+function loadReplayFile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { _applyReplayData(JSON.parse(e.target.result), file.name); }
+    catch(err) { alert('Failed to parse replay JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+function loadReplayEpisode(epIdx) {
+  if (!replayData) return;
+  pbStop();
+  replayStepIdx = 0;
+  // Render first board from replay
+  const ep = replayData.episodes[epIdx];
+  if (!ep || !ep.steps.length) return;
+  const firstStep = ep.steps[0];
+  const fakeGame = { board: firstStep.board };
+  const pbBoardEl = document.getElementById('pb-board');
+  if (!pbBoardEl.children.length) createCells(pbBoardEl);
+  renderBoard(pbBoardEl, fakeGame);
+  document.getElementById('pb-done').classList.add('hidden');
+  document.getElementById('pb-score').textContent = '0';
+  document.getElementById('pb-moves').textContent = '0';
+  document.getElementById('pb-maxtile').textContent = firstStep.board.flat ? Math.max(...firstStep.board.flat()) : 0;
+}
+
+function clearReplay() {
+  replayData = null; replayMode = false; replayStepIdx = 0;
+  document.getElementById('replay-bar').classList.add('hidden');
+  pbNewEpisode();
+  if (_manifest?.agents?.length) _rebuildDropdown();
+}
+
+// Replay step — reads pre-recorded actions from replayData
+function replayStep() {
+  if (!replayData) return;
+
+  const epIdx = parseInt(document.getElementById('replay-ep-select').value) || 0;
+  const ep = replayData.episodes[epIdx];
+  if (!ep) return;
+
+  if (replayStepIdx >= ep.steps.length) {
+    pbStop();
+    updatePbHistChart();
+    document.getElementById('pb-done').classList.remove('hidden');
+    document.getElementById('pb-done-txt').textContent =
+      `Score: ${ep.final_score.toLocaleString()} · Max Tile: ${ep.max_tile}`;
+    return;
+  }
+
+  const step = ep.steps[replayStepIdx];
+  replayStepIdx++;
+
+  // Sample score every 20 moves for chart
+  if (replayStepIdx % 20 === 0 || replayStepIdx === ep.steps.length) {
+    pbScoreHistory.push({move: replayStepIdx, score: step.total_score});
+    updatePbHistChart();
+  }
+
+  // Render board
+  const pbBoardEl = document.getElementById('pb-board');
+  if (!pbBoardEl.children.length) createCells(pbBoardEl);
+  renderBoard(pbBoardEl, { board: step.board });
+
+  // Update probabilities
+  ['up','right','down','left'].forEach((n, i) => {
+    const pct = Math.round(step.probs[i] * 100);
+    document.getElementById('prob-' + n).style.width = pct + '%';
+    document.getElementById('pv-' + n).textContent = pct + '%';
+  });
+
+  // Update stats
+  document.getElementById('pb-score').textContent = step.total_score.toLocaleString();
+  document.getElementById('pb-moves').textContent = replayStepIdx;
+  document.getElementById('pb-maxtile').textContent = step.max_tile;
+
+  // Append to reasoning log
+  const logEl = document.getElementById('agent-log');
+  if (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+  const line = document.createElement('div');
+  const chosen = Math.round(step.probs[step.action] * 100);
+  line.textContent =
+    `[${replayStepIdx}] ${step.action_name.padEnd(6)} conf:${chosen}%  Δ+${step.score_delta}  max:${step.max_tile}`;
+  line.style.color = step.score_delta > 0 ? '#705900' : 'inherit';
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ═════════════════════════════════════════════════════════
+   MANIFEST — auto-loads from logs/manifest.json on page open
+   Dropdown shows ONLY agents that have trained checkpoints + replays.
+═════════════════════════════════════════════════════════ */
+let _manifest = null;
+let _replayMode = 'normal';   // 'normal' | 'hunt'
+let _trainingMode = '1m';     // '1m' | '5m'
+let _selectedAgentId = null; // persists across mode switches
+
+// Agent accent colors
+const AGENT_COLORS = {
+  dqn:   '#5b5c59',
+  ppo:   '#705900',
+  a2c:   '#aeadaa',
+  qrdqn: '#ac292e',
+  sac:   '#9b1c24',
+  lfa:   '#1a6b3a',
+  grpo:  '#6b21a8',
+  grpo_0:  '#6b21a8',
+  'grpo_0.5b': '#7c3aed',
+  'grpo_1.5b': '#5b21b6',
+};
+
+function setReplayMode(mode) {
+  _replayMode = mode;
+  const isHunt = mode === 'hunt';
+  document.getElementById('mode-normal-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!isHunt ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('mode-hunt-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${isHunt ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant'}`;
+
+  // Rebuild dropdown showing all agents
+  _rebuildDropdown();
+}
+
+function setTrainingMode(mode) {
+  _trainingMode = mode;
+  const is5m = mode === '5m';
+  document.getElementById('train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Reload manifest for the selected training mode
+  bmInited = false;
+  loadManifest();
+}
+
+function _replayUrlFor(agent) {
+  return _replayMode === 'hunt' ? agent.hunt_replay : agent.replay;
+}
+
+function _runCommandFor(agent) {
+  const id = agent.id?.replace(/_5m$/, '') ?? agent.id;
+  const modeSuffix = _trainingMode === '5m' ? ' --mode 5m' : '';
+  if (_replayMode === 'hunt') {
+    return `python -m src.classical.hunt_2048 --agents ${id}${modeSuffix}`;
+  }
+  return `python -m src.classical.export_all${modeSuffix}`;
+}
+
+function _showNoData(agent) {
+  pbStop();
+  document.getElementById('pb-done').classList.add('hidden');
+  const overlay = document.getElementById('pb-nodata');
+  overlay.classList.remove('hidden');
+  // Dark mode support
+  overlay.style.background = document.documentElement.classList.contains('dark')
+    ? 'rgba(26,26,26,0.94)' : 'rgba(248,246,243,0.94)';
+  const modeName = _trainingMode.toUpperCase();
+  const replayName = _replayMode === 'hunt' ? 'Hunt' : 'Normal';
+  document.getElementById('nodata-title').textContent =
+    `No ${replayName} replay — ${modeName}`;
+  document.getElementById('nodata-sub').textContent =
+    `${agent.name} has no ${replayName.toLowerCase()} replay in ${modeName} mode. Run:`;
+  document.getElementById('nodata-cmd').textContent = _runCommandFor(agent);
+
+  // Also clear info bar stats
+  document.getElementById('agent-info-avg').textContent = '—';
+  document.getElementById('agent-info-tile').textContent = '—';
+  document.getElementById('agent-info-moves').textContent = '—';
+  document.getElementById('agent-info-bar').classList.remove('hidden');
+  document.getElementById('agent-info-name').textContent = agent.name;
+  document.getElementById('agent-info-badge').textContent =
+    _trainingMode.toUpperCase() + ' · ' + replayName;
+  const baseId = agent.id?.replace(/_5m$/, '');
+  document.getElementById('agent-info-dot').style.background =
+    AGENT_COLORS[baseId] ?? '#8c4a00';
+}
+
+function _hideNoData() {
+  document.getElementById('pb-nodata').classList.add('hidden');
+}
+
+function _rebuildDropdown() {
+  if (!_manifest) return;
+  const sel = document.getElementById('agent-select');
+  const isHunt = _replayMode === 'hunt';
+
+  // Show ALL agents — mark unavailable ones with ⚠
+  const all = _manifest.agents.map((a, i) => ({a, i}));
+
+  if (!all.length) {
+    sel.innerHTML = '<option value="">No agents in manifest</option>';
+    sel.disabled = true;
+    return;
+  }
+
+  sel.innerHTML = all.map(({a, i}) => {
+    const hasData = isHunt ? !!a.hunt_replay : !!a.replay;
+    const summary  = isHunt ? a.hunt_replay_summary : (a.replay_summary ?? {});
+    const topTile  = summary?.max_tile_ever ?? a.training?.max_tile_ever ?? '?';
+    const avgScore = isHunt
+      ? (summary?.avg_score != null ? Math.round(summary.avg_score).toLocaleString() : '?')
+      : (a.training?.avg_score != null ? Math.round(a.training.avg_score).toLocaleString() : '?');
+    const prefix = hasData ? '' : '⚠ ';
+    const suffix = hasData ? `  ·  avg ${avgScore}  ·  top ${topTile}` : '  ·  no data';
+    return `<option value="${i}">${prefix}${a.name}${suffix}</option>`;
+  }).join('');
+  sel.disabled = false;
+
+  function _loadSelected(idx) {
+    if (isNaN(idx)) return;
+    const agent = _manifest.agents[idx];
+    const hasData = isHunt ? !!agent.hunt_replay : !!agent.replay;
+    _selectedAgentId = agent.id?.replace(/_5m$/, '') ?? null;
+    if (!hasData) {
+      _showNoData(agent);
+      return;
+    }
+    _hideNoData();
+    pbStop();
+    _updateAgentInfoBar(agent);
+    const url = _replayUrlFor(agent);
+    if (url) loadReplayFromUrl(url, agent.name + (isHunt ? ' (Hunt)' : ''));
+  }
+
+  sel.onchange = () => _loadSelected(parseInt(sel.value));
+
+  // Restore previously selected agent if in manifest, else first
+  const preferredEntry = _selectedAgentId
+    ? all.find(({a}) => (a.id?.replace(/_5m$/, '') ?? a.id) === _selectedAgentId)
+    : null;
+  const targetIdx = (preferredEntry ?? all[0]).i;
+  sel.value = String(targetIdx);
+  _loadSelected(targetIdx);
+}
+
+function _updateAgentInfoBar(agent) {
+  const isHunt = _replayMode === 'hunt';
+  const summary = isHunt ? agent.hunt_replay_summary : (agent.replay_summary ?? {});
+  const training = agent.training ?? {};
+
+  const bar = document.getElementById('agent-info-bar');
+  bar.classList.remove('hidden');
+
+  document.getElementById('agent-info-name').textContent = agent.name;
+  document.getElementById('agent-info-badge').textContent = _trainingMode.toUpperCase() + (isHunt ? ' · Hunt' : '');
+
+  // Color dot from AGENT_COLORS
+  const baseId = agent.id?.replace(/_5m$/, '');
+  const color = AGENT_COLORS[baseId] ?? '#8c4a00';
+  document.getElementById('agent-info-dot').style.background = color;
+
+  // Avg score: use replay summary when available, fall back to training
+  const avgScore = summary?.avg_score ?? training?.avg_score;
+  document.getElementById('agent-info-avg').textContent =
+    avgScore != null ? Math.round(avgScore).toLocaleString() : '—';
+
+  // Max tile
+  const maxTile = summary?.max_tile_ever ?? training?.max_tile_ever;
+  document.getElementById('agent-info-tile').textContent = maxTile ?? '—';
+
+  // Avg moves
+  const avgMoves = summary?.avg_moves ?? training?.avg_moves;
+  document.getElementById('agent-info-moves').textContent =
+    avgMoves != null ? Math.round(avgMoves) : '—';
+}
+
+async function loadManifest() {
+  const sel = document.getElementById('agent-select');
+  const manifestFile = _trainingMode === '5m' ? 'logs/manifest_5m.json' : 'logs/manifest.json';
+  try {
+    const res = await fetch(manifestFile + '?t=' + Date.now()); // cache-bust
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _manifest = await res.json();
+  } catch(e) {
+    sel.innerHTML = `<option value="">⚠ No ${_trainingMode.toUpperCase()} data — run export_all --mode ${_trainingMode}</option>`;
+    sel.disabled = false;
+    return;
+  }
+  if (!_manifest.agents?.length) {
+    sel.innerHTML = '<option value="">No trained agents found</option>';
+    sel.disabled = false;
+    return;
+  }
+  _rebuildDropdown();
+}
+
+async function refreshPlayback() {
+  const btn = document.querySelector('[onclick="refreshPlayback()"]');
+  const icon = btn?.querySelector('.material-symbols-outlined');
+  if (icon) { icon.style.animation = 'spin 0.7s linear infinite'; }
+  _manifest = null;
+  bmInited = false;
+  document.getElementById('agent-info-bar').classList.add('hidden');
+  await loadManifest();
+  if (icon) { icon.style.animation = ''; }
+}
+
+async function loadReplayFromUrl(url, label) {
+  const logEl = document.getElementById('agent-log');
+  logEl.innerHTML = '';
+  const hintLine = document.createElement('div');
+  hintLine.textContent = `[LOADING] Fetching ${label ?? url}…`;
+  hintLine.style.opacity = '0.5';
+  logEl.appendChild(hintLine);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _applyReplayData(await res.json(), label ?? url);
+  } catch(e) {
+    logEl.innerHTML = '';
+    const err = document.createElement('div');
+    err.textContent = `[ERROR] ${e.message} — run: python3 src/classical/export_all.py`;
+    err.style.color = '#c0392b';
+    logEl.appendChild(err);
+  }
+}
+
+function _applyReplayData(data, label) {
+  if (!data.episodes?.length) { alert('Empty or invalid replay'); return; }
+  replayData = data; replayMode = true; replayStepIdx = 0;
+  pbScoreHistory = [];
+  if(pbHistChart){pbHistChart.data.labels=[];pbHistChart.data.datasets[0].data=[];pbHistChart.update();}
+  const epSel = document.getElementById('replay-ep-select');
+  epSel.innerHTML = data.episodes.map((ep, i) =>
+    `<option value="${i}">Ep ${ep.episode} · ${ep.final_score.toLocaleString()} pts · ${ep.max_tile} tile</option>`
+  ).join('');
+  epSel.onchange = () => { pbStop(); loadReplayEpisode(parseInt(epSel.value)); };
+  document.getElementById('replay-bar').classList.remove('hidden');
+  document.getElementById('replay-label').textContent =
+    `${(data.agent ?? '').toUpperCase()} · ${label}`;
+  const ep0 = data.episodes[0];
+  document.getElementById('replay-meta').textContent =
+    `score ${ep0.final_score.toLocaleString()} · top tile ${ep0.max_tile} · ${ep0.num_moves} moves`;
+  loadReplayEpisode(0);
+  const logEl = document.getElementById('agent-log');
+  logEl.innerHTML = '';
+  const line = document.createElement('div');
+  line.textContent = `[READY] ${(data.agent ?? '').toUpperCase()} · best run: ${ep0.final_score.toLocaleString()} pts · tile ${ep0.max_tile}`;
+  line.style.color = '#8c4a00'; line.style.fontWeight = 'bold';
+  logEl.appendChild(line);
+}
+
+/* ═════════════════════════════════════════════════════════
+   PLAYBACK KEYBOARD SHORTCUTS
+═════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (document.getElementById('view-playback').classList.contains('hidden')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); pbStep(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pbStepBack(); }
+  else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); pbToggle(); }
+  else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); pbNewEpisode(); }
+});
+
+/* Step backward in playback */
+function pbStepBack() {
+  if (!replayData || replayStepIdx <= 0) return;
+  replayStepIdx = Math.max(0, replayStepIdx - 1);
+  const epIdx = parseInt(document.getElementById('replay-ep-select').value) || 0;
+  const ep = replayData.episodes[epIdx];
+  if (!ep) return;
+  if (replayStepIdx === 0) {
+    loadReplayEpisode(epIdx);
+    return;
+  }
+  const step = ep.steps[replayStepIdx - 1];
+  const pbBoardEl = document.getElementById('pb-board');
+  if (!pbBoardEl.children.length) createCells(pbBoardEl);
+  renderBoard(pbBoardEl, { board: step.board });
+  ['up','right','down','left'].forEach((n, i) => {
+    const pct = Math.round(step.probs[i] * 100);
+    document.getElementById('prob-' + n).style.width = pct + '%';
+    document.getElementById('pv-' + n).textContent = pct + '%';
+  });
+  document.getElementById('pb-score').textContent = step.total_score.toLocaleString();
+  document.getElementById('pb-moves').textContent = replayStepIdx;
+  document.getElementById('pb-maxtile').textContent = step.max_tile;
+  // Update action distribution on step back
+  _recalcActionDist(ep, replayStepIdx);
+}
+
+/* ═════════════════════════════════════════════════════════
+   PLAYBACK ACTION DISTRIBUTION DOUGHNUT
+═════════════════════════════════════════════════════════ */
+let pbActionsChart = null;
+const pbActionCounts = [0, 0, 0, 0]; // UP, RIGHT, DOWN, LEFT
+
+function _initPbActionsChart() {
+  if (pbActionsChart) return;
+  pbActionsChart = new Chart(document.getElementById('chartPbActions'), {
+    type: 'doughnut',
+    data: {
+      labels: ['UP', 'RIGHT', 'DOWN', 'LEFT'],
+      datasets: [{
+        data: [0, 0, 0, 0],
+        backgroundColor: ['#8c4a00', '#705900', '#ac292e', '#1a6b3a'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10, padding: 12 } }
+      }
+    }
+  });
+}
+
+function _updatePbActionsChart() {
+  if (!pbActionsChart) _initPbActionsChart();
+  pbActionsChart.data.datasets[0].data = [...pbActionCounts];
+  pbActionsChart.update('none');
+}
+
+function _resetPbActionCounts() {
+  pbActionCounts[0] = 0; pbActionCounts[1] = 0; pbActionCounts[2] = 0; pbActionCounts[3] = 0;
+  if (pbActionsChart) {
+    pbActionsChart.data.datasets[0].data = [0, 0, 0, 0];
+    pbActionsChart.update('none');
+  }
+}
+
+function _recalcActionDist(ep, upToStep) {
+  pbActionCounts[0] = 0; pbActionCounts[1] = 0; pbActionCounts[2] = 0; pbActionCounts[3] = 0;
+  for (let i = 0; i < upToStep && i < ep.steps.length; i++) {
+    const a = ep.steps[i].action;
+    if (a >= 0 && a <= 3) pbActionCounts[a]++;
+  }
+  _updatePbActionsChart();
+}
+
+/* Patch pbStep to track action counts */
+const _origReplayStep = replayStep;
+replayStep = function() {
+  const epIdx = parseInt(document.getElementById('replay-ep-select').value) || 0;
+  const ep = replayData?.episodes[epIdx];
+  const prevIdx = replayStepIdx;
+  _origReplayStep();
+  if (ep && replayStepIdx > prevIdx) {
+    const step = ep.steps[prevIdx];
+    if (step && step.action >= 0 && step.action <= 3) {
+      pbActionCounts[step.action]++;
+      _updatePbActionsChart();
+    }
+  }
+};
+
+/* Patch pbNewEpisode to reset action counts */
+const _origPbNewEpisode = pbNewEpisode;
+pbNewEpisode = function() {
+  _resetPbActionCounts();
+  _origPbNewEpisode();
+  if (!pbActionsChart) _initPbActionsChart();
+};
+
+/* ═════════════════════════════════════════════════════════
+   DARK MODE TOGGLE
+═════════════════════════════════════════════════════════ */
+function toggleDarkMode() {
+  const html = document.documentElement;
+  const isDark = html.classList.toggle('dark');
+  localStorage.setItem('rlvr-dark', isDark ? '1' : '0');
+  document.getElementById('dark-mode-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+  document.getElementById('dark-mode-label').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+// Restore dark mode from localStorage
+(function() {
+  if (localStorage.getItem('rlvr-dark') === '1') {
+    document.documentElement.classList.add('dark');
+    document.getElementById('dark-mode-icon').textContent = 'light_mode';
+    document.getElementById('dark-mode-label').textContent = 'Light Mode';
+  }
+})();
+
+/* ═════════════════════════════════════════════════════════
+   BENCHMARK TRAINING MODE TOGGLE
+═════════════════════════════════════════════════════════ */
+function setBmTrainingMode(mode) {
+  _trainingMode = mode;
+  const is5m = mode === '5m';
+  document.getElementById('bm-train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('bm-train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Also sync playback training mode buttons
+  document.getElementById('train-1m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${!is5m ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('train-5m-btn').className =
+    `px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${is5m ? 'bg-tertiary text-on-tertiary' : 'text-on-surface-variant'}`;
+  // Reset and reload benchmark
+  bmInited = false;
+  // Destroy existing charts so they can be recreated
+  if (chartScore) { chartScore.destroy(); chartScore = null; }
+  if (chartTile) { chartTile.destroy(); chartTile = null; }
+  if (chartEpLength) { chartEpLength.destroy(); chartEpLength = null; }
+  if (chartWinRate) { chartWinRate.destroy(); chartWinRate = null; }
+  if (chartCompare) { chartCompare.destroy(); chartCompare = null; }
+  initBenchmark();
+  // Reload manifest for playback too
+  loadManifest();
+}
+
+/* ═════════════════════════════════════════════════════════
+   BENCHMARK EXTRA CHARTS (Episode Length, Win Rate, Action Dist)
+═════════════════════════════════════════════════════════ */
+let chartEpLength = null, chartWinRate = null, chartCompare = null;
+
+/* Inject extra benchmark charts — called at end of initBenchmark */
+const _origInitBenchmark = initBenchmark;
+initBenchmark = async function() {
+  await _origInitBenchmark();
+  await _buildExtraBenchmarkCharts();
+};
+
+async function _buildExtraBenchmarkCharts() {
+  const modeSuffix = _trainingMode === '5m' ? '_5m' : '';
+  const allAgentData = await Promise.all(AGENT_DEFS.map(async def => {
+    try {
+      const r = await fetch(`logs/${def.id}${modeSuffix}/${def.id}_metrics.csv`);
+      if (!r.ok) return null;
+      const rows = _parseCSV(await r.text());
+      if (!rows.length) return null;
+      return { ...def, rows };
+    } catch(e) { return null; }
+  }));
+  const agents = allAgentData.filter(Boolean);
+  if (!agents.length) return;
+
+  /* Episode Length Distribution */
+  const bucketLabels = ['0-100', '100-200', '200-500', '500-1000', '1000+'];
+  const bucketRanges = [[0,100],[100,200],[200,500],[500,1000],[1000,Infinity]];
+  if (!chartEpLength) {
+    chartEpLength = new Chart(document.getElementById('chartEpLength'), {
+      type: 'bar',
+      data: {
+        labels: bucketLabels,
+        datasets: agents.map(a => {
+          const lengths = a.rows.map(r => +(r.num_moves || r.episode_length || 0));
+          const counts = bucketRanges.map(([lo, hi]) => lengths.filter(l => l >= lo && l < hi).length);
+          return { label: a.name, data: counts, backgroundColor: a.color, borderRadius: 4 };
+        })
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
+        scales: {
+          x: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+          y: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(0,0,0,0.04)' },
+               title: { display: true, text: 'Episodes', font: { family: 'Inter', size: 9 } } }
+        }
+      }
+    });
+  }
+
+  /* Tile 512+ Rate Over Training */
+  const nPts = 200;
+  if (!chartWinRate) {
+    chartWinRate = new Chart(document.getElementById('chartWinRate'), {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: nPts }, (_, i) => Math.round(i * (agents[0].rows.length / nPts))),
+        datasets: agents.map(a => {
+          const tiles = a.rows.map(r => +r.max_tile);
+          const cumPct = [];
+          let wins = 0;
+          const step = Math.max(1, Math.floor(tiles.length / nPts));
+          for (let i = 0; i < nPts; i++) {
+            const idx = Math.min(Math.floor(i * step) + step, tiles.length);
+            const slice = tiles.slice(0, idx);
+            wins = slice.filter(t => t >= 512).length;
+            cumPct.push(+((wins / Math.max(1, slice.length)) * 100).toFixed(2));
+          }
+          return {
+            label: a.name, data: cumPct, borderColor: a.color, backgroundColor: a.color + '18',
+            fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2,
+          };
+        })
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 10 }, boxWidth: 10 } } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 6, font: { family: 'Inter', size: 10 } }, grid: { display: false },
+               title: { display: true, text: 'Episode', font: { family: 'Inter', size: 9 } } },
+          y: { ticks: { font: { family: 'Inter', size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' },
+               title: { display: true, text: 'Cumulative %', font: { family: 'Inter', size: 9 } } }
+        }
+      }
+    });
+  }
+
+  /* 1M vs 5M Comparison — always loads both manifests fresh */
+  initCompareChart();
+}
+
+/* ═════════════════════════════════════════════════════════
+   1M vs 5M COMPARISON CHART
+═════════════════════════════════════════════════════════ */
+let _cmpMetric = 'avg_score';
+
+function setCmpMetric(metric) {
+  _cmpMetric = metric;
+  document.getElementById('cmp-score-btn').className =
+    `px-3 py-1 text-xs font-bold rounded-lg transition-all ${metric === 'avg_score' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  document.getElementById('cmp-tile-btn').className =
+    `px-3 py-1 text-xs font-bold rounded-lg transition-all ${metric === 'max_tile' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`;
+  renderCompareChart();
+}
+
+async function initCompareChart() {
+  renderCompareChart();
+}
+
+async function _loadAgentStats(manifestUrl) {
+  try {
+    const r = await fetch(manifestUrl);
+    if (!r.ok) return [];
+    const manifest = await r.json();
+    return manifest.agents
+      .filter(a => a.replay_summary)
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        avg_score: a.replay_summary.avg_score ?? 0,
+        max_tile:  a.replay_summary.max_tile_ever ?? 0,
+      }));
+  } catch(e) { return []; }
+}
+
+async function renderCompareChart() {
+  const canvas = document.getElementById('chartCompare');
+  if (!canvas) return;
+  if (chartCompare) { chartCompare.destroy(); chartCompare = null; }
+
+  // Always load both 1M and 5M fresh, independent of current training mode
+  const [agents1m, agents5m] = await Promise.all([
+    _loadAgentStats('logs/manifest.json'),
+    _loadAgentStats('logs/manifest_5m.json'),
+  ]);
+
+  if (!agents1m.length) return;
+
+  const labels = agents1m.map(a => a.name);
+  const get1m = a => _cmpMetric === 'avg_score' ? a.avg_score : a.max_tile;
+  const get5m = id => {
+    const a5 = agents5m.find(a => a.id === id);
+    return a5 ? (_cmpMetric === 'avg_score' ? a5.avg_score : a5.max_tile) : null;
+  };
+
+  const yLabel = _cmpMetric === 'avg_score' ? 'Avg Score' : 'Max Tile Reached';
+
+  chartCompare = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '1M Steps',
+          data: agents1m.map(a => get1m(a)),
+          backgroundColor: agents1m.map(a => (AGENT_COLORS[a.id] || '#777') + 'cc'),
+          borderColor:     agents1m.map(a => AGENT_COLORS[a.id] || '#777'),
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+        {
+          label: '5M Steps',
+          data: agents1m.map(a => get5m(a.id)),
+          backgroundColor: agents1m.map(a => (AGENT_COLORS[a.id] || '#777') + '55'),
+          borderColor:     agents1m.map(a => AGENT_COLORS[a.id] || '#777'),
+          borderWidth: 2,
+          borderDash: [4, 4],
+          borderRadius: 6,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? (_cmpMetric === 'avg_score' ? Math.round(ctx.parsed.y).toLocaleString() : ctx.parsed.y) : 'No data'}`
+        }}
+      },
+      scales: {
+        x: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        y: {
+          ticks: { font: { family: 'Inter', size: 10 }, callback: v => _cmpMetric === 'avg_score' && v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          title: { display: true, text: yLabel, font: { family: 'Inter', size: 10 } },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+newGame();
+initBenchmark(); // preload legend
+</script>
+</body>
+</html>

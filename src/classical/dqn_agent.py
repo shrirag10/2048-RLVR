@@ -187,6 +187,47 @@ class DQNAgent:
 
             return int(q_values.argmax().item())
 
+    def select_action_batch(
+        self, states: np.ndarray, valid_actions_list: list | None = None
+    ) -> np.ndarray:
+        """
+        Select actions for N envs using a single batched GPU forward pass.
+
+        Per-env ε-greedy: random envs are sampled individually;
+        exploiting envs are batched on the GPU for efficiency.
+
+        Args:
+            states: (n_envs, 16, 4, 4) observation array.
+            valid_actions_list: list of valid-action lists, one per env.
+        Returns:
+            int32 array of shape (n_envs,).
+        """
+        n = states.shape[0]
+        actions = np.zeros(n, dtype=np.int32)
+
+        # Per-env ε-greedy decision
+        explore_mask = np.random.random(n) < self.epsilon
+
+        for i in np.where(explore_mask)[0]:
+            va = (valid_actions_list[i] if valid_actions_list else None) or list(range(4))
+            actions[i] = random.choice(va)
+
+        exploit_idxs = np.where(~explore_mask)[0]
+        if len(exploit_idxs) > 0:
+            with torch.no_grad():
+                batch = torch.FloatTensor(states[exploit_idxs]).to(self.device)
+                q_vals = self.policy_net(batch)          # (k, 4)
+                if valid_actions_list:
+                    for j, env_i in enumerate(exploit_idxs):
+                        va = valid_actions_list[env_i] or list(range(4))
+                        mask = torch.full((4,), float("-inf"), device=self.device)
+                        for a in va:
+                            mask[a] = 0.0
+                        q_vals[j] = q_vals[j] + mask
+                actions[exploit_idxs] = q_vals.argmax(dim=1).cpu().numpy()
+
+        return actions
+
     def update(self) -> Optional[float]:
         """
         Perform one gradient step on a batch from the replay buffer.
@@ -288,6 +329,7 @@ def train_dqn(
     log_dir: str = "logs/dqn",
     reward_mode: str = "score_delta",
     seed: int = 42,
+    n_envs: int = 1,
     **agent_kwargs,
 ) -> DQNAgent:
     """
@@ -321,7 +363,128 @@ def train_dqn(
     print(f"║  DQN Training — {total_steps:,} steps               ║")
     print(f"║  Device: {agent.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
+
+    # ── Vectorized training path (n_envs > 1) ────────────────────────
+    if n_envs > 1:
+        import functools
+        import gymnasium as gym
+
+        env_fns = [
+            functools.partial(Gym2048Env, reward_mode=reward_mode, seed=seed + i)
+            for i in range(n_envs)
+        ]
+        vec_envs = gym.vector.AsyncVectorEnv(env_fns)
+        obs_v, infos_v = vec_envs.reset()
+
+        ep_moves = np.zeros(n_envs, dtype=int)
+        ep_score = np.zeros(n_envs, dtype=float)      # accumulated reward per env
+        ep_max_tile = np.zeros(n_envs, dtype=int)     # running max tile per env
+        ep_starts_v = [time.time()] * n_envs
+        episode_num_v = 0
+
+        for step in tqdm(
+            range(1, total_steps + 1), desc="DQN Training", unit="step",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+        ):
+            agent.steps_done = step * n_envs   # track total env interactions
+
+            # Extract valid_actions per env (dict-of-lists in gymnasium >= 0.26)
+            raw_va = infos_v.get("valid_actions") if isinstance(infos_v, dict) else None
+            va_list = [
+                list(raw_va[i]) if raw_va is not None and raw_va[i] is not None
+                else list(range(4))
+                for i in range(n_envs)
+            ]
+
+            actions_v = agent.select_action_batch(obs_v, va_list)
+            next_obs_v, rewards_v, terms_v, truncs_v, next_infos_v = vec_envs.step(actions_v)
+            dones_v = terms_v | truncs_v
+
+            fo_arr = next_infos_v.get("final_observation") if isinstance(next_infos_v, dict) else None
+            fi_arr = next_infos_v.get("final_info") if isinstance(next_infos_v, dict) else None
+
+            for i in range(n_envs):
+                # Use terminal obs (before auto-reset) for done envs
+                if dones_v[i] and fo_arr is not None and fo_arr[i] is not None:
+                    actual_next = fo_arr[i]
+                else:
+                    actual_next = next_obs_v[i]
+
+                agent.replay_buffer.push(
+                    Transition(obs_v[i], int(actions_v[i]), float(rewards_v[i]),
+                               actual_next, bool(dones_v[i]))
+                )
+                ep_moves[i] += 1
+                ep_score[i] += float(rewards_v[i])
+
+                # Track max tile from next_infos_v (before auto-reset it reflects current board)
+                tile_now = int(
+                    next_infos_v.get("max_tile", np.zeros(n_envs))[i]
+                    if isinstance(next_infos_v, dict)
+                    else 0
+                )
+                if tile_now > ep_max_tile[i]:
+                    ep_max_tile[i] = tile_now
+
+                if dones_v[i]:
+                    episode_num_v += 1
+                    agent.episodes_done = episode_num_v
+                    # Try final_info first; fall back to our own accumulators
+                    fi = (fi_arr[i] if fi_arr is not None and fi_arr[i] is not None else {})
+                    f_score = fi.get("total_score", None)
+                    f_tile  = fi.get("max_tile",    None)
+                    metrics = EpisodeMetrics(
+                        episode=episode_num_v,
+                        total_score=float(f_score if f_score else ep_score[i]),
+                        max_tile=int(f_tile if f_tile else ep_max_tile[i]),
+                        num_moves=int(ep_moves[i]),
+                        valid_moves=int(ep_moves[i]),
+                        invalid_moves=0,
+                        wall_clock_seconds=time.time() - ep_starts_v[i],
+                        training_steps=step * n_envs,
+                    )
+                    logger.log_episode(metrics)
+                    ep_moves[i] = 0
+                    ep_score[i] = 0.0
+                    ep_max_tile[i] = 0
+                    ep_starts_v[i] = time.time()
+
+            agent.update()
+            agent.decay_epsilon()
+            if step % agent.target_sync_freq == 0:
+                agent.sync_target()
+
+            obs_v = next_obs_v
+            infos_v = next_infos_v
+
+            if step % eval_freq == 0:
+                summary = logger.get_summary(last_n=50)
+                if summary:
+                    tqdm.write(
+                        f"  EnvSteps {step * n_envs:>8,} | Ep {episode_num_v:>5} | "
+                        f"ε={agent.epsilon:.3f} | "
+                        f"Avg Score: {summary['avg_score']:>7.0f} | "
+                        f"Max Tile: {summary['max_tile_ever']:>5} | "
+                        f"512+: {summary['reach_512']:.1%}"
+                    )
+
+            if step % checkpoint_freq == 0:
+                ckpt_path = os.path.join(log_dir, f"dqn_step_{step * n_envs}.pt")
+                agent.save(ckpt_path)
+                logger.plot_training_curves()
+
+        agent.save(os.path.join(log_dir, "dqn_final.pt"))
+        logger.plot_training_curves()
+        vec_envs.close()
+        print(f"\n{'='*50}\nTraining complete!")
+        summary = logger.get_summary()
+        if summary:
+            for k, v in summary.items():
+                print(f"  {k}: {v}")
+        return agent
+    # ── End vectorized path ───────────────────────────────────────────
 
     obs, info = env.reset()
     episode_score = 0.0

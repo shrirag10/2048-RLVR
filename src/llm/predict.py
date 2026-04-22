@@ -97,39 +97,21 @@ def load_model(
     is_adapter = os.path.exists(adapter_config)
 
     if is_adapter:
+        # Auto-detect base model from adapter config
+        with open(adapter_config) as f:
+            import json as _json
+            adapter_cfg = _json.load(f)
+        detected_base = adapter_cfg.get("base_model_name_or_path", base_model)
         print(f"Loading adapter weights from: {model_path}")
-        print(f"Base model: {base_model}")
+        print(f"Base model (auto-detected): {detected_base}")
 
-        # Load base model first
+        # Let Unsloth load the adapter directly — it handles base model + adapter natively
         model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=base_model,
+            model_name=model_path,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
             dtype=None,
         )
-
-        # Apply LoRA adapters (same config as training)
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r=16,
-            lora_alpha=16,
-            target_modules=[
-                "q_proj", "k_proj", "v_proj", "o_proj",
-                "gate_proj", "up_proj", "down_proj",
-            ],
-            lora_dropout=0.0,
-            bias="none",
-            use_gradient_checkpointing="unsloth",
-        )
-
-        # Load trained adapter weights
-        from peft import set_peft_model_state_dict
-        import safetensors.torch
-
-        adapter_weights = safetensors.torch.load_file(
-            os.path.join(model_path, "adapter_model.safetensors")
-        )
-        set_peft_model_state_dict(model, adapter_weights)
         print("Adapter weights loaded successfully.")
     else:
         print(f"Loading merged model from: {model_path}")
@@ -188,10 +170,12 @@ def generate_move(
         add_generation_prompt=True,
         return_tensors="pt",
     ).to(model.device)
+    attention_mask = (input_ids != tokenizer.eos_token_id).long()
 
     with torch.no_grad():
         outputs = model.generate(
             input_ids=input_ids,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             min_new_tokens=10,  # Prevent immediate EOS
             temperature=temperature,

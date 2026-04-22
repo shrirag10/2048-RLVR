@@ -45,7 +45,7 @@ class DiscreteSACNetwork(nn.Module):
     Architecture follows the same CNN as DQN/PPO/A2C for fair comparison.
     """
 
-    def __init__(self, n_channels: int = 16, n_actions: int = 4):
+    def __init__(self, n_channels: int = 16, n_actions: int = 4, hidden_dim: int = 512):
         super().__init__()
 
         # Shared CNN backbone
@@ -64,23 +64,35 @@ class DiscreteSACNetwork(nn.Module):
             sample = torch.zeros(1, n_channels, 4, 4)
             n_flat = self.backbone(sample).shape[1]
 
-        self.fc = nn.Sequential(
-            nn.Linear(n_flat, 256),
-            nn.ReLU(),
-        )
+        # Single hidden layer: used by checkpoints trained with hidden_dim=256
+        # Two layer: used by default new training (512->256)
+        if hidden_dim == 256:
+            self.fc = nn.Sequential(nn.Linear(n_flat, 256), nn.ReLU())
+            head_dim = 256
+        else:
+            self.fc = nn.Sequential(
+                nn.Linear(n_flat, hidden_dim), nn.ReLU(),
+                nn.Linear(hidden_dim, 256), nn.ReLU(),
+            )
+            head_dim = 256
 
         # Actor head: outputs action logits
-        self.actor = nn.Linear(256, n_actions)
+        self.actor = nn.Linear(head_dim, n_actions)
 
         # Twin Q-networks (Double Q-learning)
-        self.q1 = nn.Linear(256, n_actions)
-        self.q2 = nn.Linear(256, n_actions)
+        self.q1 = nn.Linear(head_dim, n_actions)
+        self.q2 = nn.Linear(head_dim, n_actions)
 
     def forward(self, x: torch.Tensor):
         """Returns (action_probs, q1_values, q2_values)."""
         features = self.fc(self.backbone(x))
         logits = self.actor(features)
+        # Clamp logits for numerical stability
+        logits = logits.clamp(-20, 20)
         action_probs = F.softmax(logits, dim=-1)
+        # Guard against NaN
+        action_probs = action_probs.clamp(min=1e-8)
+        action_probs = action_probs / action_probs.sum(dim=-1, keepdim=True)
         q1 = self.q1(features)
         q2 = self.q2(features)
         return action_probs, q1, q2
@@ -135,13 +147,13 @@ class DiscreteSACAgent:
 
     def __init__(
         self,
-        lr: float = 3e-4,
+        lr: float = 1e-4,
         gamma: float = 0.99,
         tau: float = 0.005,
-        buffer_size: int = 100_000,
-        batch_size: int = 64,
-        learning_starts: int = 5000,
-        target_entropy_ratio: float = 0.5,
+        buffer_size: int = 200_000,
+        batch_size: int = 256,
+        learning_starts: int = 10_000,
+        target_entropy_ratio: float = 0.4,       # lower → less entropy → more exploitation
         device: str = "auto",
     ):
         if device == "auto":
@@ -158,7 +170,7 @@ class DiscreteSACAgent:
         self.target = DiscreteSACNetwork().to(self.device)
         self.target.load_state_dict(self.online.state_dict())
 
-        # Optimizers
+        # Optimizers — critic includes backbone so Q-networks can learn features
         self.actor_optimizer = Adam(
             list(self.online.backbone.parameters()) +
             list(self.online.fc.parameters()) +
@@ -166,6 +178,8 @@ class DiscreteSACAgent:
             lr=lr,
         )
         self.critic_optimizer = Adam(
+            list(self.online.backbone.parameters()) +
+            list(self.online.fc.parameters()) +
             list(self.online.q1.parameters()) +
             list(self.online.q2.parameters()),
             lr=lr,
@@ -200,7 +214,18 @@ class DiscreteSACAgent:
                 for a in valid_actions:
                     mask[a] = 1.0
                 action_probs = action_probs * mask
-                action_probs = action_probs / (action_probs.sum() + 1e-8)
+                prob_sum = action_probs.sum()
+                if prob_sum > 0 and not torch.isnan(prob_sum):
+                    action_probs = action_probs / prob_sum
+                else:
+                    # Fallback to uniform over valid actions
+                    action_probs = mask / mask.sum()
+
+            # NaN safety check
+            if torch.isnan(action_probs).any():
+                if valid_actions:
+                    return np.random.choice(valid_actions)
+                return np.random.randint(4)
 
             if deterministic:
                 action = action_probs.argmax(dim=-1).item()
@@ -209,6 +234,49 @@ class DiscreteSACAgent:
                 action = dist.sample().item()
 
         return action
+
+    def select_action_batch(
+        self,
+        states: np.ndarray,
+        valid_actions_list: list | None = None,
+        deterministic: bool = False,
+    ) -> np.ndarray:
+        """
+        Select actions for N envs using a single batched GPU forward pass.
+
+        Args:
+            states: (n_envs, 16, 4, 4) observation array.
+            valid_actions_list: list of valid-action lists, one per env.
+            deterministic: if True, use argmax; else sample from policy.
+        Returns:
+            int32 array of shape (n_envs,).
+        """
+        states_t = torch.tensor(states, dtype=torch.float32).to(self.device)
+        with torch.no_grad():
+            action_probs, _, _ = self.online(states_t)   # (n, 4)
+
+        if valid_actions_list:
+            for i, va in enumerate(valid_actions_list):
+                va = va or list(range(4))
+                mask = torch.zeros(4, device=self.device)
+                for a in va:
+                    mask[a] = 1.0
+                action_probs[i] = action_probs[i] * mask
+                s = action_probs[i].sum()
+                if s > 0 and not torch.isnan(s):
+                    action_probs[i] = action_probs[i] / s
+                else:
+                    action_probs[i] = mask / mask.sum()
+
+        if torch.isnan(action_probs).any():
+            # Safety fallback
+            uniform = torch.ones(len(states), 4, device=self.device) / 4
+            action_probs = uniform
+
+        if deterministic:
+            return action_probs.argmax(dim=1).cpu().numpy().astype(np.int32)
+        dist = torch.distributions.Categorical(action_probs)
+        return dist.sample().cpu().numpy().astype(np.int32)
 
     def update(self) -> dict | None:
         """Perform one gradient step."""
@@ -265,6 +333,10 @@ class DiscreteSACAgent:
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
+        # Clamp log_alpha to prevent divergence (α ∈ [~0.002, ~2.7])
+        with torch.no_grad():
+            self.log_alpha.clamp_(-6.0, 1.0)  # old range [-3,3] let α hit 20 and stay stuck
+
         # ─── Soft Target Update ───────────────────────────────
         for param, target_param in zip(self.online.parameters(), self.target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1.0 - self.tau) * target_param.data)
@@ -286,11 +358,18 @@ class DiscreteSACAgent:
         }, path + ".pt")
 
     def load(self, path: str):
-        """Load agent checkpoint."""
+        """Load checkpoint, auto-detecting FC architecture from saved weights."""
         if not path.endswith(".pt"):
             path = path + ".pt"
         checkpoint = torch.load(path, map_location=self.device, weights_only=True)
-        self.online.load_state_dict(checkpoint["online_state_dict"])
+        sd = checkpoint["online_state_dict"]
+        # Detect hidden_dim from fc.0.weight shape: [hidden_dim, n_flat]
+        detected_dim = sd["fc.0.weight"].shape[0] if "fc.0.weight" in sd else 512
+        if detected_dim != 512:
+            # Rebuild networks with the checkpoint's architecture
+            self.online = DiscreteSACNetwork(hidden_dim=detected_dim).to(self.device)
+            self.target = DiscreteSACNetwork(hidden_dim=detected_dim).to(self.device)
+        self.online.load_state_dict(sd)
         self.target.load_state_dict(checkpoint["target_state_dict"])
         if "log_alpha" in checkpoint:
             self.log_alpha.data = checkpoint["log_alpha"].to(self.device)
@@ -303,14 +382,17 @@ def train_sac(
     eval_freq: int = 10_000,
     checkpoint_freq: int = 50_000,
     log_dir: str = "logs/sac",
-    reward_mode: str = "score_delta",
+    reward_mode: str = "score_delta",          # match DQN — clean signal for SAC's entropy objective
     seed: int = 42,
-    lr: float = 3e-4,
-    gamma: float = 0.99,
+    lr: float = 1e-4,                         # stable LR for actor-critic
+    gamma: float = 0.99,                      # match DQN
     tau: float = 0.005,
-    buffer_size: int = 100_000,
-    batch_size: int = 64,
-    learning_starts: int = 5000,
+    buffer_size: int = 200_000,               # bigger buffer for off-policy diversity
+    batch_size: int = 256,                    # larger batch for stable twin-Q updates
+    learning_starts: int = 10_000,            # collect diverse initial data
+    update_every: int = 4,                    # update every N steps (not every step — 4x speedup)
+    gradient_steps: int = 2,                  # compensate with 2 gradient steps per update
+    n_envs: int = 8,                          # parallel envs for speed
     device: str = "auto",
 ) -> DiscreteSACAgent:
     """
@@ -334,7 +416,113 @@ def train_sac(
     print(f"║  Discrete SAC Training — {total_steps:,} steps     ║")
     print(f"║  Device: {agent.device}                          ║")
     print(f"║  Reward: {reward_mode}                    ║")
+    print(f"║  Parallel envs: {n_envs}                           ║")
     print(f"╚══════════════════════════════════════════╝")
+
+    # ── Vectorized training path (n_envs > 1) ────────────────────────
+    if n_envs > 1:
+        import functools
+        import gymnasium as gym
+
+        env_fns = [
+            functools.partial(Gym2048Env, reward_mode=reward_mode, seed=seed + i)
+            for i in range(n_envs)
+        ]
+        vec_envs = gym.vector.AsyncVectorEnv(env_fns)
+        obs_v, infos_v = vec_envs.reset()
+
+        ep_moves = np.zeros(n_envs, dtype=int)
+        ep_score = np.zeros(n_envs, dtype=float)
+        ep_max_tile = np.zeros(n_envs, dtype=int)
+        ep_starts_v = [time.time()] * n_envs
+        episode_num_v = 0
+
+        pbar = tqdm(range(1, total_steps + 1), desc="SAC Training", unit="step",
+                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]")
+        for step in pbar:
+            raw_va = infos_v.get("valid_actions") if isinstance(infos_v, dict) else None
+            va_list = [
+                list(raw_va[i]) if raw_va is not None and raw_va[i] is not None
+                else list(range(4))
+                for i in range(n_envs)
+            ]
+
+            actions_v = agent.select_action_batch(obs_v, va_list, deterministic=False)
+            next_obs_v, rewards_v, terms_v, truncs_v, next_infos_v = vec_envs.step(actions_v)
+            dones_v = terms_v | truncs_v
+
+            fo_arr = next_infos_v.get("final_observation") if isinstance(next_infos_v, dict) else None
+            fi_arr = next_infos_v.get("final_info") if isinstance(next_infos_v, dict) else None
+
+            for i in range(n_envs):
+                if dones_v[i] and fo_arr is not None and fo_arr[i] is not None:
+                    actual_next = fo_arr[i]
+                else:
+                    actual_next = next_obs_v[i]
+
+                agent.buffer.push(Transition(obs_v[i], int(actions_v[i]),
+                                             float(rewards_v[i]), actual_next, bool(dones_v[i])))
+                ep_moves[i] += 1
+                ep_score[i] += float(rewards_v[i])
+                tile_now = int(
+                    next_infos_v.get("max_tile", np.zeros(n_envs))[i]
+                    if isinstance(next_infos_v, dict) else 0
+                )
+                if tile_now > ep_max_tile[i]:
+                    ep_max_tile[i] = tile_now
+
+                if dones_v[i]:
+                    episode_num_v += 1
+                    fi = (fi_arr[i] if fi_arr is not None and fi_arr[i] is not None else {})
+                    f_score = fi.get("total_score", None)
+                    f_tile  = fi.get("max_tile",    None)
+                    metrics = EpisodeMetrics(
+                        episode=episode_num_v,
+                        total_score=float(f_score if f_score else ep_score[i]),
+                        max_tile=int(f_tile if f_tile else ep_max_tile[i]),
+                        num_moves=int(ep_moves[i]),
+                        valid_moves=int(ep_moves[i]),
+                        invalid_moves=0,
+                        wall_clock_seconds=time.time() - ep_starts_v[i],
+                        training_steps=step * n_envs,
+                    )
+                    logger.log_episode(metrics)
+                    ep_moves[i] = 0
+                    ep_score[i] = 0.0
+                    ep_max_tile[i] = 0
+                    ep_starts_v[i] = time.time()
+
+            if step * n_envs >= learning_starts and step % update_every == 0:
+                for _ in range(gradient_steps):
+                    agent.update()
+
+            obs_v = next_obs_v
+            infos_v = next_infos_v
+
+            if step % eval_freq == 0:
+                summary = logger.get_summary(last_n=50)
+                if summary:
+                    tqdm.write(
+                        f"  EnvSteps {step * n_envs:>8,} | Ep {episode_num_v:>5} | "
+                        f"Avg Score: {summary['avg_score']:>7.0f} | "
+                        f"Max Tile: {summary['max_tile_ever']:>5} | "
+                        f"α: {agent.alpha:.3f}"
+                    )
+
+            if step % checkpoint_freq == 0:
+                agent.save(os.path.join(log_dir, f"sac_step_{step * n_envs}"))
+                logger.plot_training_curves()
+
+        agent.save(os.path.join(log_dir, "sac_final"))
+        logger.plot_training_curves()
+        vec_envs.close()
+        print(f"\n{'='*50}\nTraining complete!")
+        summary = logger.get_summary()
+        if summary:
+            for k, v in summary.items():
+                print(f"  {k}: {v}")
+        return agent
+    # ── End vectorized path ───────────────────────────────────────────
 
     obs, info = env.reset()
     episode_num = 0
