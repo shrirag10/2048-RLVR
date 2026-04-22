@@ -487,12 +487,12 @@ However, RLVR provides a unique advantage: \emph{interpretability}. Every GRPO m
 
 Figure~\ref{fig:param_efficiency} plots average score against parameter count on a logarithmic scale, revealing the non-monotonic relationship between model size and performance.
 
-\begin{figure*}[t]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.7\textwidth]{fig_param_efficiency.png}
+    \includegraphics[width=\columnwidth]{fig_param_efficiency.png}
     \caption{Parameter efficiency: average score vs.\ model size (log scale). Semi-gradient SARSA (120 parameters) outperforms four agents with $2{,}750\times$ more parameters, and both GRPO-LLM agents with $4{,}000{,}000\times$ more parameters. DQN's 330K parameters achieve the best absolute performance. The LLM agents occupy the upper-right quadrant, trading parameter efficiency for interpretability.}
     \label{fig:param_efficiency}
-\end{figure*}
+\end{figure}
 
 Semi-gradient SARSA's position (120 parameters, score 2,456) represents the most parameter-efficient configuration in our study. It outperforms four deep agents with $2{,}750\times$ more parameters and both GRPO-LLM agents with approximately $4{,}000{,}000\times$ more parameters. This demonstrates that domain knowledge encoded in hand-crafted features can outperform end-to-end learning from raw observations when the feature space is well-designed for the task (S\&B~\S9.5). However, this advantage depends on expert knowledge of the domain, and SARSA's representational ceiling (the bounded approximation error of linear FA described in \S9.4) prevents it from reaching DQN's performance, which requires the nonlinear function approximation of neural networks.
 
