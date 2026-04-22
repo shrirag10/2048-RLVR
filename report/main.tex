@@ -102,7 +102,7 @@ This replaces the critic's state-dependent baseline with a sample-based, prompt-
 Szubert \& Ja\'skowski~\cite{szubert2014temporal} use temporal-difference learning with n-tuple networks, achieving tile 65536 via tabular value approximation over hand-designed board patterns. Saligram et al.~\cite{saligram2025delayed} apply DQN with delayed-reward shaping. We exclude expert-designed tabular methods such as n-tuple TD from our baselines because our focus is on general-purpose deep RL algorithms that require no 2048-specific representation design; Semi-gradient SARSA with 30 engineered features serves as our closest proxy.
 
 \textbf{Deep RL for games.}
-Mnih et al.~\cite{mnih2015human} demonstrated human-level Atari play with DQN. Subsequent work introduced distributional RL~\cite{dabney2018distributional}, entropy-regularized policies~\cite{haarnoja2018soft}, and trust-region methods~\cite{schulman2017proximal}. We evaluate all four paradigms on a single game with matched architectures.
+Mnih et al.~\cite{mnih2015human} demonstrated human-level Atari play with DQN.\@ Subsequent work introduced distributional RL~\cite{dabney2018distributional}, entropy-regularized policies~\cite{haarnoja2018soft}, and trust-region methods~\cite{schulman2017proximal}. We evaluate all four paradigms on a single game with matched architectures.
 
 \textbf{LLMs for game-playing.}
 Hu et al.~\cite{hu2025lmgame} benchmark LLMs on diverse games including 2048, finding that even large models struggle with spatial reasoning. Our work extends this by \emph{training} LLMs via GRPO rather than prompting pretrained models, and directly comparing the trained LLM against classical RL agents under controlled conditions.
@@ -135,13 +135,13 @@ Our DQN uses a custom PyTorch implementation rather than Stable-Baselines3 (SB3)
 
 Hyperparameters: replay buffer 100K, batch size 64, $\varepsilon$: $1.0 \to 0.01$ over 100K steps, target sync every 1K steps, learning rate $10^{-4}$ (Adam), gradient clipping 1.0.
 
-\subsubsection{SAC -- Discrete (Custom PyTorch).}
+\subsubsection{SAC---Discrete (Custom PyTorch).}
 
 Standard SAC~\cite{haarnoja2018soft} targets continuous actions. We implement the discrete adaptation of Christodoulou~\cite{christodoulou2019soft} with categorical policies, twin Q-networks, and automatic temperature tuning. This required custom code because SB3 does not natively support discrete SAC with invalid action masking in the policy distribution.
 
 Hyperparameters: replay buffer 200K, batch size 256, Polyak $\tau=0.005$, learning rate $10^{-4}$, warmup 10K steps, target entropy $0.4 \cdot \log|\mathcal{A}|$.
 
-\subsubsection{PPO -- MaskablePPO (Stable-Baselines3).}
+\subsubsection{PPO---MaskablePPO (Stable-Baselines3).}
 
 We use SB3's MaskablePPO~\cite{raffin2021stable}, which natively supports action masking via environment-provided masks.
 
@@ -436,7 +436,10 @@ Several structural limitations of GRPO become apparent when applied outside its 
 The 1.5B model produces interpretable move explanations during interactive evaluation. For example, given a board with 256 anchored in the bottom-right corner, we observed the following output:
 
 \begin{quote}
-\small\texttt{<think> 256 anchored bottom-right -- good. Gradient: 128, 64, 32, 16 intact along right/bottom edges. RIGHT merges 4+4 in row~1 (+8). Avoids scattering corner tile. </think> <answer>RIGHT</answer>}
+\small\texttt{<think> 256 anchored bottom-right - good.} \\
+\small\texttt{Gradient: 128, 64, 32, 16 intact along right/bottom edges.} \\
+\small\texttt{RIGHT merges 4+4 in row~1 (+8). Avoids scattering corner.} \\
+\small\texttt{</think> <answer>RIGHT</answer>}
 \end{quote}
 
 This reasoning trace mirrors the snake-pattern heuristic used in classical agents: anchor the highest tile in a corner and build a monotonic gradient outward. That the model generates this strategy from 500 training steps on 2,000 prompts is notable.
@@ -467,7 +470,7 @@ Figure~\ref{fig:classical_vs_rlvr} directly compares all eight agents. Table~\re
 \midrule
 Best Avg Score   & \textbf{7,744} (DQN, 5M)      & 2,348 (1.5B) \\
 Best Max Tile    & \textbf{2048} (DQN, hunt)       & 256 (1.5B) \\
-Parameters       & 120 -- 430K                     & 494M -- 1.8B \\
+Parameters       & 120--430K                     & 494M--1.8B \\
 Inference        & \textbf{$<$4\,ms/move}          & 1,500\,ms/move \\
 Training data    & 5M env steps ($\sim$2 hrs)       & 2,000 prompts ($\sim$76 min) \\
 Training compute & $\sim$2 hrs (RTX 4060)            & $\sim$76 min (same GPU) \\
