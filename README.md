@@ -1,6 +1,6 @@
 # Solving 2048: Classical RL vs. LLM-Guided RLVR
 
-> **CS 5180 — Reinforcement Learning** &nbsp;|&nbsp; Northeastern University  
+> **CS 5180 - Reinforcement Learning** &nbsp;|&nbsp; Northeastern University  
 > **Authors:** Shriman Raghav Srinivasan, Gautham Ramkumar  
 > **Report:** [AAAI-26 Format Paper](report/main.pdf) &nbsp;|&nbsp; [Poster](report/poster_a1.pdf)
 
@@ -24,7 +24,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 
 ## Results
 
-### Classical Agents — 5M Training Steps (single seed)
+### Classical Agents - 5M Training Steps (single seed)
 
 | Agent | Impl. | Avg Score | Max Score | Max Tile | 512+ Rate | 1M→5M Δ |
 | ------- | ----- | --------- | --------- | -------- | --------- | -------- |
@@ -37,7 +37,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 
 ![Sample Efficiency: 1M vs 5M](assets/fig_sample_efficiency.png)
 
-### GRPO-Trained LLMs — 500 Training Steps over 2,000 Prompts
+### GRPO-Trained LLMs - 500 Training Steps over 2,000 Prompts
 
 | Model | Avg Score | Max Tile | Params | ms/move | Training Time |
 | ------- | --------- | -------- | ------ | ------- | ------------- |
@@ -46,7 +46,7 @@ A systematic comparative study of **six classical Reinforcement Learning agents*
 
 ![GRPO Scaling: 0.5B vs 1.5B](assets/fig_grpo_scaling.png)
 
-### Hunt Mode — 1M Checkpoint, ε=0.05, Unlimited Attempts
+### Hunt Mode - 1M Checkpoint, ε=0.05, Unlimited Attempts
 
 | Agent | Attempts | Best Tile | Best Score |
 | ------- | -------- | --------- | ---------- |
@@ -120,7 +120,7 @@ RLVR/
 The 2048 game is modeled as a finite-horizon MDP:
 
 - **State space:** 16-channel binary tensor `x ∈ {0,1}^{16×4×4}` (CNN agents) or labeled ASCII grid (LLM agents)
-- **Action space:** {UP, RIGHT, DOWN, LEFT} — 4 discrete actions
+- **Action space:** {UP, RIGHT, DOWN, LEFT} - 4 discrete actions
 - **Transition:** Deterministic tile-sliding + stochastic spawn (90% tile-2, 10% tile-4)
 - **Reward:** Score-delta + milestone bonuses (+50 at 256, +100 at 512, +200 at 1024) + penalty for invalid moves (−1)
 - **Discount:** γ = 0.99
@@ -137,11 +137,11 @@ Conv2D(16→128, 2×2) → ReLU → Conv2D(128→128, 2×2) → ReLU → Conv2D(
 
 ### Custom Implementations (PyTorch / NumPy)
 
-**DQN** — Custom PyTorch implementation with invalid Q-value masking inside the forward pass (SB3's DQN lacks this). Replay buffer 100K, batch 64, ε: 1.0→0.01 over 100K steps, target sync every 1K steps, lr=1e-4, gradient clipping 1.0.
+**DQN** - Custom PyTorch implementation with invalid Q-value masking inside the forward pass (SB3's DQN lacks this). Replay buffer 100K, batch 64, ε: 1.0→0.01 over 100K steps, target sync every 1K steps, lr=1e-4, gradient clipping 1.0.
 
-**SAC (Discrete)** — Custom adaptation of Christodoulou (2019) with categorical policies, twin Q-networks, and automatic temperature tuning. Buffer 200K, batch 256, Polyak τ=0.005, target entropy 0.4·log|A|.
+**SAC (Discrete)** - Custom adaptation of Christodoulou (2019) with categorical policies, twin Q-networks, and automatic temperature tuning. Buffer 200K, batch 256, Polyak τ=0.005, target entropy 0.4·log|A|.
 
-**Semi-gradient SARSA** — Sutton & Barto Algorithm 10.1 with 30-dimensional hand-crafted features:
+**Semi-gradient SARSA** - Sutton & Barto Algorithm 10.1 with 30-dimensional hand-crafted features:
 
 | Features (30 total) | Dim | Description |
 | --------------------- | --- | ----------- |
@@ -160,11 +160,11 @@ Weight matrix: `w ∈ ℝ^{4×30}` = 120 parameters. Step-size α=1e-3, ε-decay
 
 ### Stable-Baselines3 Agents
 
-**PPO** (MaskablePPO) — Rollout 512 steps × 8 envs, batch 128, 4 epochs, lr=2e-4, γ=0.995, clip ε=0.2, entropy coef=0.05.
+**PPO** (MaskablePPO) - Rollout 512 steps × 8 envs, batch 128, 4 epochs, lr=2e-4, γ=0.995, clip ε=0.2, entropy coef=0.05.
 
-**A2C** — 5-step returns, lr=7e-4, entropy coef=0.01, value coef=0.5.
+**A2C** - 5-step returns, lr=7e-4, entropy coef=0.01, value coef=0.5.
 
-**QR-DQN** — 50 quantiles (4×50=200 output values), buffer 100K, batch 64, lr=1e-4, target sync 1K steps.
+**QR-DQN** - 50 quantiles (4×50=200 output values), buffer 100K, batch 64, lr=1e-4, target sync 1K steps.
 
 ### GRPO-Trained LLMs
 
@@ -183,7 +183,7 @@ Weight matrix: `w ∈ ℝ^{4×30}` = 120 parameters. Step-size α=1e-3, ε-decay
 | Training time | ~41 min | ~76 min |
 | Seed | 42 | 42 |
 
-**Why Local GRPO, Not an LLM API?** GRPO requires per-token log-probabilities and their gradients for the clipped policy update — commercial APIs don't expose model weights or gradient computation. Local deployment also ensures deterministic training under fixed seeds.
+**Why Local GRPO, Not an LLM API?** GRPO requires per-token log-probabilities and their gradients for the clipped policy update - commercial APIs don't expose model weights or gradient computation. Local deployment also ensures deterministic training under fixed seeds.
 
 **Reward Schedule (3-stage curriculum):**
 
@@ -231,7 +231,7 @@ python -m src.classical.train train --agent lfa --steps 5000000 --mode 5m
 ```bash
 pip install -r requirements/llm.txt
 
-# GRPO training — Qwen2.5-0.5B + QLoRA 4-bit
+# GRPO training - Qwen2.5-0.5B + QLoRA 4-bit
 python -m src.llm.train_grpo \
   --dataset-size 2000 \
   --epochs 3 \
@@ -282,13 +282,13 @@ python -m pytest tests/ -v
 
 The research report follows the **AAAI-26 conference format** and covers:
 
-1. **Abstract** — Problem statement and key results
-2. **Introduction** — Why 2048 is a challenging benchmark; classical RL vs RLVR motivation
-3. **Background** — MDP formulation, value-based methods, policy-gradient methods, linear FA, GRPO
-4. **Related Work** — n-tuple TD networks (SOTA at tile 65536), deep RL for games, LLMs for game-playing, RLVR
-5. **Project Description** — Environment, shared CNN backbone, all agent implementations with hyperparameters, GRPO pipeline
-6. **Experiments** — 1M/5M/Hunt mode evaluation tiers, mechanism analysis of DQN dominance, on-policy degradation, GRPO scaling and spatial failure analysis
-7. **Conclusion** — Four key findings with appropriate hedging for single-seed limitations
+1. **Abstract** - Problem statement and key results
+2. **Introduction** - Why 2048 is a challenging benchmark; classical RL vs RLVR motivation
+3. **Background** - MDP formulation, value-based methods, policy-gradient methods, linear FA, GRPO
+4. **Related Work** - n-tuple TD networks (SOTA at tile 65536), deep RL for games, LLMs for game-playing, RLVR
+5. **Project Description** - Environment, shared CNN backbone, all agent implementations with hyperparameters, GRPO pipeline
+6. **Experiments** - 1M/5M/Hunt mode evaluation tiers, mechanism analysis of DQN dominance, on-policy degradation, GRPO scaling and spatial failure analysis
+7. **Conclusion** - Four key findings with appropriate hedging for single-seed limitations
 
 ---
 
