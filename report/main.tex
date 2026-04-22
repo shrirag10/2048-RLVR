@@ -515,7 +515,7 @@ We presented a systematic comparison of six classical RL agents and two GRPO-tra
     \item \textbf{LLM scale drives RLVR performance.} preliminary evidence from two model scales ($3\times$ parameters $\to$ $3.3\times$ higher score) suggests spatial reasoning benefits from model capacity; GRPO uniquely produces interpretable per-move rationale, but spatial reasoning remains a bottleneck at small scales.
 \end{enumerate}
 
-Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU, replay buffer ablation (10K--500K) to quantify the exact contribution of replay to DQN's dominance, multi-seed evaluation for statistical significance, and hybrid LLM-MCTS approaches combining interpretability with search efficiency.
+Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU. Because our primary focus was algorithm comparison on identical architectures rather than hyperparameter sweeps, we did not perform a strict ablation study on buffer capacity; therefore, systematic replay buffer ablation (e.g., 10K--500K) to quantify the exact contribution of replay to DQN's dominance remains a logical next step. Additional work includes multi-seed evaluation for statistical significance, and hybrid LLM-MCTS approaches combining interpretability with search efficiency.
 
 %%====================================================================
 \section*{Acknowledgment}
