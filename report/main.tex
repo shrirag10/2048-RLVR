@@ -294,7 +294,7 @@ SAC's automatic temperature tuning~\cite{haarnoja2018soft} targets entropy $0.4 
 \textbf{Clipping constraints under heavy-tailed rewards.}
 PPO's $\epsilon{=}0.2$ clip~\cite{schulman2017proximal} bounds the magnitude of policy updates per iteration. In 2048, a single merge of two 1024-tiles yields 1024 reward units while hundreds of preceding moves yield negligible reward. The same clipping that prevents destructive updates under smooth reward surfaces also limits the gradient magnitude needed to propagate value from these rare, high-reward merges back through the trajectory.
 
-\subsection{DQN Analysis}
+\subsection{DQN Training Dynamics}
 
 Figure~\ref{fig:dqn_training} shows the joint evolution of DQN's average score and maximum tile achieved (in $\log_2$ scale) over 5M training steps. Both metrics improve monotonically, with score growth accelerating after approximately 2M steps as the agent learns to chain high-value merges. The $\log_2$ tile metric indicates that DQN consistently reaches tile 512 ($2^9$) after 1M steps and tile 1024 ($2^{10}$) after 3M steps, with sporadic 2048 ($2^{11}$) episodes appearing in the final million steps.
 
