@@ -604,72 +604,10 @@ We presented a systematic comparison of six classical RL agents and two GRPO-tra
 Future work includes scaling GRPO to Qwen2.5-3B/7B on an A100 GPU. Because our primary focus was algorithm comparison on identical architectures rather than hyperparameter sweeps, we did not perform a strict ablation study on buffer capacity; therefore, systematic replay buffer ablation (e.g., 10K--500K) to quantify the exact contribution of replay to DQN's dominance remains a logical next step. Additional work includes multi-seed evaluation for statistical significance, and hybrid LLM-MCTS approaches combining interpretability with search efficiency.
 
 %%====================================================================
-\begin{algorithm}[htbp]
-\caption{Discrete Soft Actor-Critic (SAC)}
-\label{alg:sac}
-\begin{algorithmic}[1]
-\State Initialize twin Q-networks $Q_{\theta_1}, Q_{\theta_2}$, targets $Q_{\theta'_1}, Q_{\theta'_2}$
-\State Initialize actor network $\pi_\phi$, temperature parameter $\alpha$
-\State Initialize replay buffer $\mathcal{D}$
-\For{step $t = 1$ to $T$}
-    \State Sample $a_t \sim \pi_\phi(\cdot | s_t)$ and execute
-    \State Store $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
-    \State Sample mini-batch from $\mathcal{D}$
-    \State $V(s_{t+1}) = \sum_a \pi_\phi(a|s_{t+1}) [\min_{i=1,2} Q_{\theta'_i}(s_{t+1}, a) - \alpha \log \pi_\phi(a|s_{t+1})]$
-    \State $y_t = r_t + \gamma V(s_{t+1})$
-    \State Update critics $\theta_i$ to minimize $(Q_{\theta_i}(s_t, a_t) - y_t)^2$
-    \State Update actor $\phi$ to minimize $\sum_a \pi_\phi(a|s_t) [\alpha \log \pi_\phi(a|s_t) - \min_{i=1,2} Q_{\theta_i}(s_t, a)]$
-    \State Update $\alpha$ to minimize $\alpha (\log \pi_\phi(a_t|s_t) + \bar{\mathcal{H}})$
-    \State Soft update target networks $\theta'_i \leftarrow \tau \theta_i + (1 - \tau) \theta'_i$
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[htbp]
-\caption{Semi-gradient SARSA with Linear FA}
-\label{alg:sarsa}
-\begin{algorithmic}[1]
-\State Initialize weight vector $\mathbf{w} = \mathbf{0} \in \mathbb{R}^{30}$
-\For{episode $e = 1$ to $E$}
-    \State Extract features $\phi(S)$ from initial state $S$
-    \State Choose $A \sim \epsilon\text{-greedy}(\mathbf{w}^\top \phi(S, \cdot))$
-    \Repeat
-        \State Take action $A$, observe $R, S'$
-        \If{$S'$ is terminal}
-            \State $\mathbf{w} \leftarrow \mathbf{w} + \alpha [R - \mathbf{w}^\top \phi(S, A)] \phi(S, A)$
-        \Else
-            \State Choose $A' \sim \epsilon\text{-greedy}(\mathbf{w}^\top \phi(S', \cdot))$
-            \State $\mathbf{w} \leftarrow \mathbf{w} + \alpha [R + \gamma \mathbf{w}^\top \phi(S', A') - \mathbf{w}^\top \phi(S, A)] \phi(S, A)$
-            \State $S \leftarrow S'$, $A \leftarrow A'$
-        \EndIf
-    \Until{$S'$ is terminal}
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[htbp]
-\caption{Group Relative Policy Optimization (GRPO)}
-\label{alg:grpo}
-\begin{algorithmic}[1]
-\State Initialize LLM policy $\pi_\theta$ and reference model $\pi_{\text{ref}} \leftarrow \pi_\theta$
-\For{iteration $k = 1$ to $K$}
-    \State Sample prompt $q$ (board state)
-    \State Generate $G$ completions $\{o_1, \ldots, o_G\}$ using $\pi_{\text{old}}$
-    \State Compute reward $r_i$ for each completion using environment rules
-    \State Compute group advantages: $A_i = \frac{r_i - \text{mean}(r)}{\text{std}(r)}$
-    \State Compute policy ratio: $\rho_i = \frac{\pi_\theta(o_i|q)}{\pi_{\text{old}}(o_i|q)}$
-    \State Compute KL divergence: $\mathbb{D}_{\text{KL}} = \frac{\pi_{\text{ref}}(o_i|q)}{\pi_\theta(o_i|q)} - \log \frac{\pi_{\text{ref}}(o_i|q)}{\pi_\theta(o_i|q)} - 1$
-    \State Update $\theta$ by maximizing surrogate objective:
-    \State $\mathcal{L}_{\text{GRPO}}(\theta) = \frac{1}{G} \sum_{i=1}^G \Big[ \min\big(\rho_i A_i, \text{clip}(\rho_i, 1-\epsilon, 1+\epsilon) A_i\big)$
-    \State \qquad $- \beta \mathbb{D}_{\text{KL}} \Big]$
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
 %%====================================================================
 \section*{Acknowledgment}
 
-This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM). Additionally, AI tools were used to assist in the generic formatting, structuring, and drafting of this manuscript.
+This project was completed as part of CS~5180 (Reinforcement Learning) taught by Professor Robert Platt at Northeastern University. All experiments were conducted on a single NVIDIA RTX 4060 Laptop GPU (8\,GB VRAM). Additionally, AI tools were used to assist in the codebase development, as well as the generic formatting, structuring, and drafting of this manuscript.
 
 %%====================================================================
 \bibliographystyle{unsrt}
